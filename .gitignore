@@ -1,0 +1,30 @@
+# 🔐 ENV (IMPORTANT)
+.env
+
+# 🐍 Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+venv/
+env/
+ENV/
+
+# 🖥 macOS
+.DS_Store
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Cache
+.cache/
+
+# Build
+dist/
+build/
