@@ -210,6 +210,10 @@ def refine_search():
         merged = {**original_req}
 
         for key, val in new_req.items():
+            # 🚫 DO NOT overwrite category with null/empty
+            if key == "category" and not val:
+                continue
+
             if val is not None and val != {} and val != []:
                 merged[key] = val
 
@@ -243,7 +247,7 @@ def refine_search():
     elif "camera" in query_lower:
         merged["category"] = "camera"
 
-    # keep previous category if not mentioned
+    # ✅ Keep previous category if not mentioned
     if not merged.get("category"):
         merged["category"] = original_req.get("category", "laptop")
 
@@ -279,10 +283,17 @@ def refine_search():
     if "lightweight" in modifiers or "portable" in modifiers:
         merged.setdefault("priority_specs", {})["portability"] = True
 
-    # ─── STEP 5: FETCH PRODUCTS ───
+    # ─── STEP 5: BUILD SMART SEARCH QUERY ───
+    category = merged.get("category", "laptop")
+    base_query = merged.get("search_query") or ""
+
+    # 🔥 Always enforce category context
+    search_query = f"{category} {base_query} {user_query}".strip()
+
+    # ─── STEP 6: FETCH PRODUCTS ───
     raw_products = search_products(
-        query=merged.get("search_query", user_query),
-        category=merged.get("category"),
+        query=search_query,
+        category=category,
         budget_max=merged.get("budget_max"),
         page=1
     )
@@ -290,18 +301,18 @@ def refine_search():
     if not raw_products:
         return jsonify({"error": "No products found for refined query."}), 404
 
-    # ─── STEP 6: PROCESS + RANK ───
+    # ─── STEP 7: PROCESS + RANK ───
     df = process_products(raw_products, merged)
     ranked_df = recommend(df, merged, top_n=6)
     products_list = products_to_dict_list(ranked_df)
 
-    # ─── STEP 7: LABELS ───
+    # ─── STEP 8: LABELS ───
     for product in products_list[:3]:
         product["match_label"] = get_match_label(product.get("match_score", 0))
         product["pros"] = []
         product["cons"] = []
 
-    # ─── STEP 8: SUMMARY ───
+    # ─── STEP 9: SUMMARY ───
     try:
         summary = generate_recommendation_summary(products_list, user_query)
     except Exception:

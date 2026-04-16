@@ -22,9 +22,9 @@ def search_products(query: str, category: str = "laptop", budget_max: float = No
     url = "https://real-time-amazon-data.p.rapidapi.com/search"
 
     params = {
-        "query": f"{query} India",   # 🔥 force India relevance
+        "query": f"{query} India",
         "page": str(page),
-        "country": "IN",             # 🇮🇳 India
+        "country": "IN",
         "sort_by": "RELEVANCE",
         "product_condition": "NEW"
     }
@@ -34,18 +34,42 @@ def search_products(query: str, category: str = "laptop", budget_max: float = No
 
     try:
         response = requests.get(url, headers=HEADERS, params=params, timeout=15)
-        response.raise_for_status()
-        data = response.json()
+
+        #HANDLE RATE LIMIT
+        if response.status_code == 429:
+            print("[Amazon API] Rate limit exceeded (429)")
+            return []
+
+        #HANDLE OTHER ERRORS
+        if response.status_code != 200:
+            print(f"[Amazon API] Bad status: {response.status_code}")
+            return []
+
+        #SAFE JSON PARSE
+        try:
+            data = response.json()
+        except:
+            print("[Amazon API] Invalid JSON response")
+            return []
+
+        if not data:
+            return []
 
         products = data.get("data", {}).get("products", [])
-        return [_normalize_product(p) for p in products if p]
+
+        #SAFE NORMALIZATION
+        result = []
+        for p in products:
+            if not p or not isinstance(p, dict):
+                continue
+            result.append(_normalize_product(p))
+
+        return result
 
     except requests.exceptions.Timeout:
         print("[Amazon API] Request timed out")
         return []
-    except requests.exceptions.HTTPError as e:
-        print(f"[Amazon API] HTTP Error: {e}")
-        return []
+
     except Exception as e:
         print(f"[Amazon API] Unexpected error: {e}")
         return []
@@ -72,7 +96,7 @@ def get_product_reviews(asin: str) -> list:
 
     params = {
         "asin": asin,
-        "country": "IN",   # 🔥 FIXED (was US)
+        "country": "IN",   
         "page": "1",
         "star_rating": "ALL"
     }
@@ -107,7 +131,7 @@ def _normalize_product(raw: dict) -> dict:
         "asin": raw.get("asin", ""),
         "product_title": raw.get("product_title", "Unknown Product"),
         "product_price": price,
-        "product_price_str": price_str,  # ✅ always ₹ now
+        "product_price_str": price_str,  
         "product_star_rating": _safe_float(raw.get("product_star_rating", 0)),
         "product_num_ratings": raw.get("product_num_ratings", 0),
         "product_url": raw.get("product_url", ""),

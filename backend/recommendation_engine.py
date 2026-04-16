@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
 from data_processor import build_feature_vector
+from ml_model import predict_score
 
 
 # Weights for each feature dimension based on use case priorities
@@ -102,18 +103,18 @@ def recommend(df: pd.DataFrame, requirements: dict, top_n: int = 5) -> pd.DataFr
     weights = USE_CASE_WEIGHTS.get(use_case, DEFAULT_WEIGHTS)
     weight_vector = np.array(list(weights.values()))
 
-    # Build feature matrix
-    feature_matrix = []
+
+    # 🔥 ML-based scoring
+    ml_scores = []
+
     for _, row in df.iterrows():
-        features = build_feature_vector(row, requirements)
-        feature_matrix.append(features)
+        product_dict = row.to_dict()
+        score = predict_score(product_dict,requirements)
+        ml_scores.append(score)
 
-    feature_matrix = np.array(feature_matrix)
+    scores = np.array(ml_scores)
 
-    # Compute weighted score for each product
-    scores = feature_matrix @ weight_vector  # dot product
-
-    # Normalize scores to 0-100%
+    # Normalize to 0–100
     if scores.max() > scores.min():
         scores = (scores - scores.min()) / (scores.max() - scores.min()) * 100
     else:
