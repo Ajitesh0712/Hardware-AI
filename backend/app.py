@@ -52,7 +52,7 @@ def recommend_products():
 
     print(f"[API] New query: '{user_query}' | Session: {session_id}")
 
-    # Step 1: Parse requirements with Claude AI
+    # Step 1: Parse requirements with gemini AI
     try:
         requirements = parse_user_requirements(user_query)
         print(f"[Claude] Parsed: {requirements}")
@@ -75,7 +75,6 @@ def recommend_products():
     raw_category = (requirements.get("category") or "").lower()
     query_lower = user_query.lower()
 
-    # 🔥 NORMALIZE CATEGORY (FIX)
     if "laptop" in raw_category or "laptop" in query_lower:
         category = "laptop"
     elif "phone" in raw_category or "mobile" in raw_category or "phone" in query_lower:
@@ -111,9 +110,9 @@ def recommend_products():
             ]
         }), 400
 
-    # ✅ override clean category
+
     requirements["category"] = category
-        # ✅ END BLOCK
+
     # Step 2: Fetch products from Amazon API
     search_query = requirements.get("search_query", user_query)
     budget_max = requirements.get("budget_max")

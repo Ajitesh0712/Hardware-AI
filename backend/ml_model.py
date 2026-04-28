@@ -1,7 +1,5 @@
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
-
-# 🔥 Dummy training data (can improve later)
 # Features: [price, rating, ram, storage, gpu, battery]
 
 X = np.array([
@@ -78,7 +76,6 @@ def extract_features(product):
     price = product.get("product_price", 0)
     rating = product.get("product_star_rating", 0)
 
-    # basic parsing (safe defaults)
     ram = 16 if "16" in product.get("product_title", "") else 8
     storage = 512 if "512" in product.get("product_title", "") else 256
     gpu = 1 if "RTX" in product.get("product_title", "") else 0

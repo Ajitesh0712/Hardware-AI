@@ -1,6 +1,3 @@
-"""
-claude_ai.py (Gemini version)
-"""
 import os
 import json
 import google.generativeai as genai

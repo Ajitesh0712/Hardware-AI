@@ -1,8 +1,3 @@
-"""
-amazon_api.py
-Fetches real-time product data from Amazon via RapidAPI.
-"""
-
 import os
 import requests
 from dotenv import load_dotenv
@@ -116,7 +111,7 @@ def get_product_reviews(asin: str) -> list:
 def _normalize_product(raw: dict) -> dict:
     price_str = raw.get("product_price", "0")
 
-    # 🔥 Convert $ → ₹ if needed
+
     if "$" in price_str:
         try:
             usd_value = float(price_str.replace("$", "").replace(",", "").strip())

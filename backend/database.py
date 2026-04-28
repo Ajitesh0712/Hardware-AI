@@ -1,8 +1,3 @@
-"""
-database.py
-MySQL database layer for storing products, queries, and interactions.
-"""
-
 import os
 import json
 import mysql.connector
@@ -37,7 +32,6 @@ def get_connection():
     return get_pool().get_connection()
 
 
-# ─── Schema Initialization ────────────────────────────────────────────────────
 
 def init_db():
     """Create tables if they don't exist."""

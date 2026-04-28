@@ -1,9 +1,3 @@
-"""
-recommendation_engine.py
-ML-based recommendation system using Scikit-learn.
-Computes match scores between user requirements and products.
-"""
-
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
@@ -104,7 +98,6 @@ def recommend(df: pd.DataFrame, requirements: dict, top_n: int = 5) -> pd.DataFr
     weight_vector = np.array(list(weights.values()))
 
 
-    # 🔥 ML-based scoring
     ml_scores = []
 
     for _, row in df.iterrows():
