@@ -209,7 +209,7 @@ def refine_search():
         merged = {**original_req}
 
         for key, val in new_req.items():
-            # 🚫 DO NOT overwrite category with null/empty
+
             if key == "category" and not val:
                 continue
 
@@ -246,7 +246,7 @@ def refine_search():
     elif "camera" in query_lower:
         merged["category"] = "camera"
 
-    # ✅ Keep previous category if not mentioned
+
     if not merged.get("category"):
         merged["category"] = original_req.get("category", "laptop")
 
@@ -286,7 +286,7 @@ def refine_search():
     category = merged.get("category", "laptop")
     base_query = merged.get("search_query") or ""
 
-    # 🔥 Always enforce category context
+
     search_query = f"{category} {base_query} {user_query}".strip()
 
     # ─── STEP 6: FETCH PRODUCTS ───
@@ -342,7 +342,7 @@ def track_interaction():
     return jsonify({"success": True})
 
 
-# ─── Health Check ─────────────────────────────────────────────────────────────
+
 
 @app.route("/api/health")
 def health():
