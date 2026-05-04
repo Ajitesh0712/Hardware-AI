@@ -14,7 +14,7 @@ from amazon_api import search_products, get_product_reviews
 from data_processor import process_products, products_to_dict_list
 from recommendation_engine import recommend, get_match_label
 from database import init_db, save_query, save_recommendations, log_interaction, upsert_product
-
+import re
 load_dotenv()
 
 app = Flask(__name__, static_folder="../frontend")
@@ -77,7 +77,15 @@ def recommend_products():
 
     if "laptop" in raw_category or "laptop" in query_lower:
         category = "laptop"
-    elif "phone" in raw_category or "mobile" in raw_category or "phone" in query_lower:
+    elif (
+        "phone" in raw_category
+        or "mobile" in raw_category
+        or "phone" in query_lower
+        or "iphone" in query_lower
+        or "samsung" in query_lower
+        or "oneplus" in query_lower
+        or "pixel" in query_lower
+    ):
         category = "mobile"
     elif "headphone" in raw_category or "earbud" in raw_category or "headphone" in query_lower:
         category = "headphones"
@@ -114,16 +122,26 @@ def recommend_products():
     requirements["category"] = category
 
     # Step 2: Fetch products from Amazon API
-    search_query = requirements.get("search_query", user_query)
+    search_query = f"{category} {user_query}".strip()
     budget_max = requirements.get("budget_max")
 
     try:
-        raw_products = search_products(
-            query=search_query,
-            category=requirements.get("category", "laptop"),
-            budget_max=budget_max,
-            page=1
-        )
+        if budget_max is not None:
+
+            raw_products = search_products(
+                query=search_query,
+                category=requirements.get("category", "laptop"),
+                budget_max=budget_max,
+                page=1
+            )
+
+        else:
+
+            raw_products = search_products(
+                query=search_query,
+                category=requirements.get("category", "laptop"),
+                page=1
+            )
         print(f"[Amazon] Fetched {len(raw_products)} products")
     except Exception as e:
         print(f"[Amazon] Error: {e}")
@@ -251,21 +269,30 @@ def refine_search():
         merged["category"] = original_req.get("category", "laptop")
 
     # ─── STEP 3: AI INTENT HANDLING ───
+
     intent = new_req.get("intent")
 
     if intent == "increase_budget":
-        if merged.get("budget_max"):
+
+        if merged.get("budget_max") is not None:
             merged["budget_max"] += 20000
 
     elif intent == "decrease_budget":
-        if merged.get("budget_max"):
-            merged["budget_max"] = max(10000, merged["budget_max"] - 20000)
+
+        if merged.get("budget_max") is not None:
+            merged["budget_max"] = max(
+                10000,
+                merged["budget_max"] - 20000
+            )
 
     elif intent == "set_budget":
-        if new_req.get("budget_min"):
+
+        if new_req.get("budget_min") is not None:
             merged["budget_min"] = new_req["budget_min"]
-        if new_req.get("budget_max"):
+
+        if new_req.get("budget_max") is not None:
             merged["budget_max"] = new_req["budget_max"]
+                
 
     # ─── STEP 4: MODIFIER HANDLING ───
     modifiers = new_req.get("modifiers", [])
@@ -283,11 +310,174 @@ def refine_search():
         merged.setdefault("priority_specs", {})["portability"] = True
 
     # ─── STEP 5: BUILD SMART SEARCH QUERY ───
+   # ─── STEP 5: SMART QUERY REFINEMENT ───
+
     category = merged.get("category", "laptop")
-    base_query = merged.get("search_query") or ""
 
+    previous_query = str(
+        original_req.get("search_query", "")
+    ).strip()
 
-    search_query = f"{category} {base_query} {user_query}".strip()
+    current_query = str(user_query).strip()
+
+    query_lower = current_query.lower()
+    
+
+# ==========================================
+# REMOVE OLD BUDGET FILTERS IF NEW ONE EXISTS
+# ==========================================
+
+    budget_words = [
+        "under",
+        "below",
+        "less than",
+        "above",
+        "over",
+        "greater than"
+    ]
+
+    new_budget_detected = any(
+        word in query_lower
+        for word in budget_words
+    )
+
+    clean_previous_query = previous_query
+
+    if new_budget_detected:
+
+        clean_previous_query = re.sub(
+            r"(under|below|less than|above|over|greater than)\s*(rs\.?|₹|inr)?\s*\d+[kK]?",
+            "",
+            clean_previous_query,
+            flags=re.IGNORECASE
+        ).strip()
+        # ==========================================
+        # Detect category/brand replacement
+        # ==========================================
+
+        replacement_keywords = [
+            "instead",
+            "change",
+            "switch",
+            "different"
+        ]
+
+        brands = [
+            "iphone",
+            "apple",
+            "samsung",
+            "oneplus",
+            "pixel",
+            "lenovo",
+            "asus",
+            "dell",
+            "hp",
+            "acer",
+            "msi",
+            "sony",
+            "boat",
+            "jbl"
+        ]
+
+        new_brand_detected = any(
+            brand in query_lower
+            for brand in brands
+        )
+
+        replacement_detected = any(
+            word in query_lower
+            for word in replacement_keywords
+        )
+
+    # ==========================================
+    # Decide refinement mode
+    # ==========================================
+
+ # ==========================================
+# Detect NEW SEARCH vs REFINE
+# ==========================================
+
+    categories = [
+        "laptop",
+        "mobile",
+        "phone",
+        "iphone",
+        "smartphone",
+        "headphones",
+        "earbuds",
+        "tablet",
+        "monitor",
+        "keyboard",
+        "mouse",
+        "speaker",
+        "camera",
+        "watch"
+    ]
+
+    refine_words = [
+        "better",
+        "cheaper",
+        "lighter",
+        "battery",
+        "performance",
+        "gaming",
+        "portable",
+        "under",
+        "above",
+        "less",
+        "more",
+        "faster"
+    ]
+
+    # detect if user is asking a fresh product search
+    new_category_detected = any(
+        word in query_lower
+        for word in categories
+    )
+
+    # detect refine-type query
+    is_refinement = any(
+        word in query_lower
+        for word in refine_words
+    )
+
+    # ==========================================
+    # FINAL DECISION
+    # ==========================================
+
+    if replacement_detected:
+        
+        # explicit replace
+        combined_query = current_query
+
+    elif new_category_detected and not is_refinement:
+
+        # completely new search
+        combined_query = current_query
+
+    else:
+
+        # refine previous search
+        combined_words = []
+
+        for word in (clean_previous_query + " " + current_query).split():
+
+            if word.lower() not in [
+                w.lower()
+                for w in combined_words
+            ]:
+                combined_words.append(word)
+
+        combined_query = " ".join(combined_words)
+    # ==========================================
+    # FINAL QUERY
+    # ==========================================
+
+    search_query = combined_query.strip()
+
+    merged["search_query"] = search_query
+
+    print("[REFINED QUERY]", search_query)
 
     # ─── STEP 6: FETCH PRODUCTS ───
     raw_products = search_products(
@@ -297,8 +487,19 @@ def refine_search():
         page=1
     )
 
+    # Fallback search if no results
+
     if not raw_products:
-        return jsonify({"error": "No products found for refined query."}), 404
+
+        fallback_query = category
+
+        print("[REFINE FALLBACK]", fallback_query)
+
+        raw_products = search_products(
+            query=fallback_query,
+            category=category,
+            page=1
+        )
 
     # ─── STEP 7: PROCESS + RANK ───
     df = process_products(raw_products, merged)

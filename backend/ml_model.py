@@ -1,103 +1,358 @@
-from sklearn.ensemble import RandomForestRegressor
+import pandas as pd
 import numpy as np
-# Features: [price, rating, ram, storage, gpu, battery]
+from sklearn.ensemble import RandomForestRegressor
 
-X = np.array([
-    [80000, 4.5, 16, 512, 1, 1],
-    [75000, 4.4, 16, 512, 1, 1],
-    [70000, 4.2, 16, 512, 1, 0],
-    [65000, 4.1, 8, 512, 0, 0],
-    [60000, 4.0, 8, 256, 0, 0],
-    [55000, 3.9, 8, 256, 0, 0],
-    [50000, 3.8, 8, 256, 0, 0],
-    [45000, 3.7, 8, 256, 0, 0],
-    [40000, 3.6, 8, 256, 0, 0],
-    [35000, 3.5, 8, 256, 0, 0],
 
-    [90000, 4.6, 16, 512, 1, 1],
-    [100000, 4.7, 16, 1024, 1, 1],
-    [110000, 4.8, 32, 1024, 1, 1],
-    [120000, 4.7, 32, 1024, 1, 1],
-    [130000, 4.8, 32, 1024, 1, 1],
+df = pd.read_csv("electronics.csv")
 
-    [85000, 4.5, 16, 512, 1, 1],
-    [78000, 4.3, 16, 512, 1, 0],
-    [72000, 4.2, 16, 512, 1, 0],
-    [68000, 4.1, 16, 512, 0, 0],
 
-    [60000, 4.0, 8, 512, 0, 1],
-    [58000, 4.1, 8, 512, 0, 1],
-    [55000, 4.0, 8, 512, 0, 1],
+df["discount_price"] = (
+    df["discount_price"]
+    .astype(str)
+    .str.replace("₹", "", regex=False)
+    .str.replace(",", "", regex=False)
+)
 
-    [70000, 4.2, 16, 512, 0, 1],
-    [72000, 4.3, 16, 512, 0, 1],
-    [75000, 4.4, 16, 512, 1, 1],
+df["discount_price"] = pd.to_numeric(
+    df["discount_price"],
+    errors="coerce"
+)
 
-    [95000, 4.6, 16, 1024, 1, 1],
-    [105000, 4.7, 16, 1024, 1, 1],
+df["actual_price"] = (
+    df["actual_price"]
+    .astype(str)
+    .str.replace("₹", "", regex=False)
+    .str.replace(",", "", regex=False)
+)
 
-    [50000, 3.9, 8, 256, 0, 0],
-    [48000, 3.8, 8, 256, 0, 0],
-    [47000, 3.7, 8, 256, 0, 0],
+df["actual_price"] = pd.to_numeric(
+    df["actual_price"],
+    errors="coerce"
+)
 
-    [65000, 4.2, 8, 512, 0, 1],
-    [67000, 4.3, 8, 512, 0, 1],
+# Clean number of ratings
+df["no_of_ratings"] = (
+    df["no_of_ratings"]
+    .astype(str)
+    .str.replace(",", "", regex=False)
+)
 
-    [80000, 4.5, 16, 512, 1, 1],
-    [82000, 4.6, 16, 512, 1, 1],
-    [84000, 4.6, 16, 512, 1, 1],
+df["no_of_ratings"] = pd.to_numeric(
+    df["no_of_ratings"],
+    errors="coerce"
+)
 
-    [90000, 4.7, 16, 1024, 1, 1],
-    [92000, 4.7, 16, 1024, 1, 1],
+# Clean review ratings
+df["review_rating"] = (
+    df["review_rating"]
+    .astype(str)
+    .str.extract(r'(\d+\.\d+)')[0]
+)
 
-    [100000, 4.8, 32, 1024, 1, 1],
-    [110000, 4.8, 32, 1024, 1, 1],
-])
+df["review_rating"] = pd.to_numeric(
+    df["review_rating"],
+    errors="coerce"
+)
 
-y = np.array([
-    0.85, 0.83, 0.80, 0.70, 0.65, 0.60, 0.55, 0.50, 0.45, 0.40,
-    0.88, 0.90, 0.95, 0.94, 0.96,
-    0.87, 0.82, 0.80, 0.75,
-    0.70, 0.72, 0.71,
-    0.78, 0.80, 0.84,
-    0.88, 0.90,
-    0.55, 0.52, 0.50,
-    0.73, 0.75,
-    0.85, 0.87, 0.88,
-    0.90, 0.91,
-    0.95, 0.96
-])
-
-model = RandomForestRegressor()
-model.fit(X, y)
-
+# Remove invalid rows
+df.dropna(inplace=True)
 
 def extract_features(product):
-    price = product.get("product_price", 0)
-    rating = product.get("product_star_rating", 0)
 
-    ram = 16 if "16" in product.get("product_title", "") else 8
-    storage = 512 if "512" in product.get("product_title", "") else 256
-    gpu = 1 if "RTX" in product.get("product_title", "") else 0
-    battery = 1 if "battery" in product.get("product_title", "").lower() else 0
+    title = str(
+        product.get("name")
+        or product.get("product_title")
+        or ""
+    ).lower()
 
-    return [price, rating, ram, storage, gpu, battery]
+    price = float(
+        product.get("discount_price")
+        or product.get("product_price")
+        or 0
+    )
+
+    rating = float(
+        product.get("review_rating")
+        or product.get("product_star_rating")
+        or 0
+    )
+
+    review_count = float(
+        product.get("no_of_ratings")
+        or 0
+    )
 
 
-def predict_score(product,requirements):
+    gaming = 1 if (
+        "gaming" in title or
+        "rtx" in title
+    ) else 0
+
+    wireless = 1 if "wireless" in title else 0
+
+    rgb = 1 if "rgb" in title else 0
+
+    battery = 1 if (
+        "battery" in title or
+        "mah" in title
+    ) else 0
+
+    premium = 1 if (
+        "apple" in title or
+        "samsung" in title or
+        "sony" in title
+    ) else 0
+
+    fast_charging = 1 if (
+        "fast charging" in title or
+        "65w" in title or
+        "120w" in title
+    ) else 0
+
+    return [
+        price,
+        rating,
+        review_count,
+        gaming,
+        wireless,
+        rgb,
+        battery,
+        premium,
+        fast_charging
+    ]
+
+
+df["discount_percent"] = (
+    (df["actual_price"] - df["discount_price"])
+    / df["actual_price"]
+)
+
+df["target_score"] = (
+    (df["review_rating"] * 0.45)
+    +
+    (np.log1p(df["no_of_ratings"]) * 0.20)
+    +
+    (df["discount_percent"] * 0.20)
+)
+
+# Normalize target score
+df["target_score"] = (
+    (df["target_score"] - df["target_score"].min())
+    /
+    (
+        df["target_score"].max()
+        - df["target_score"].min()
+    )
+)
+
+
+X = np.array([
+    extract_features(row)
+    for _, row in df.iterrows()
+])
+
+y = df["target_score"].values
+
+
+model = RandomForestRegressor(
+    n_estimators=100,
+    random_state=42
+)
+
+model.fit(X, y)
+
+print("[ML] Model trained successfully.")
+
+
+def predict_score(product, requirements):
+
+    title = str(
+        product.get("name")
+        or product.get("product_title")
+        or ""
+    ).lower()
+    
+
+    query = str(
+        requirements.get("search_query", "")
+    ).lower()
+
     features = extract_features(product)
 
     score = model.predict([features])[0]
+    # =========================
+    # BRAND INTENT BOOST
+    # =========================
 
-    #adjust based on user intent
+    query = str(
+        requirements.get("search_query", "")
+    ).lower()
+
+    brand_map = {
+        "iphone": ["iphone", "apple"],
+        "apple": ["iphone", "apple"],
+        "samsung": ["samsung", "galaxy"],
+        "oneplus": ["oneplus"],
+        "lenovo": ["lenovo"],
+        "asus": ["asus"],
+        "dell": ["dell"],
+        "hp": ["hp"],
+        "sony": ["sony"],
+        "jbl": ["jbl"],
+        "boat": ["boat"]
+    }
+
+    for brand, keywords in brand_map.items():
+
+        if brand in query:
+
+            matched = any(
+                keyword in title
+                for keyword in keywords
+            )
+
+            if matched:
+                score += 0.35
+            else:
+                score -= 0.25
+
     use_case = requirements.get("use_case", "general")
 
-    if use_case == "gaming":
-        if "RTX" in product.get("product_title", ""):
-            score += 0.1
 
-    if requirements.get("budget_max"):
-        if product.get("product_price", 0) <= requirements["budget_max"]:
-            score += 0.1
+    if query and query in title:
+        score += 0.30
+
+    query_words = query.split()
+
+    match_count = 0
+
+    ignored_words = [
+        "best",
+        "under",
+        "with",
+        "for",
+        "the",
+        "a",
+        "an",
+        "top",
+        "good"
+    ]
+
+    for word in query_words:
+
+        if word in ignored_words:
+            continue
+
+        if word in title:
+            match_count += 1
+
+    score += match_count * 0.10
+
+
+    if use_case == "gaming":
+
+        if (
+            "gaming" in title or
+            "rtx" in title
+        ):
+            score += 0.12
+
+        if (
+            "144hz" in title or
+            "165hz" in title
+        ):
+            score += 0.05
+
+        if (
+            "mechanical" in title or
+            "rgb" in title
+        ):
+            score += 0.04
+
+    elif use_case == "student":
+
+        if features[0] < 70000:
+            score += 0.08
+
+        if "battery" in title:
+            score += 0.05
+
+        if "portable" in title:
+            score += 0.04
+
+    elif use_case == "business":
+
+        if features[1] >= 4.3:
+            score += 0.06
+
+        if (
+            "portable" in title or
+            "lightweight" in title
+        ):
+            score += 0.05
+
+    elif use_case == "music":
+
+        if (
+            "noise cancelling" in title or
+            "wireless" in title
+        ):
+            score += 0.08
+
+
+    budget_max = requirements.get("budget_max")
+
+    if budget_max is not None:
+
+        if features[0] <= budget_max:
+            score += 0.10
+        else:
+            score -= 0.08
+
+
+
+    if features[1] >= 4.5:
+        score += 0.05
+
+    elif features[1] <= 3.5:
+        score -= 0.05
+
+    if features[2] > 50000:
+        score += 0.05
+
+    elif features[2] < 100:
+        score -= 0.03
+
+
+
+    if features[7]:
+        score += 0.08
+
+
+
+    if features[8]:
+        score += 0.03
+
+ 
+
+    if features[4]:
+        score += 0.03
+
+
+    if features[5]:
+        score += 0.02
+
+    if features[6]:
+        score += 0.03
+
+
+    if (
+        features[0] > 150000 and
+        features[1] < 4.2
+    ):
+        score -= 0.08
+
+
+    score = max(0.0, min(score, 1.0))
 
     return float(score)

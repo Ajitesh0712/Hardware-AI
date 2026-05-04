@@ -92,6 +92,188 @@ def recommend(df: pd.DataFrame, requirements: dict, top_n: int = 5) -> pd.DataFr
     """
     if df.empty:
         return df
+    
+        # =========================
+    # REMOVE IRRELEVANT ACCESSORIES
+    # =========================
+
+    query = str(
+        requirements.get("search_query", "")
+    ).lower()
+
+    category = str(
+        requirements.get("category", "")
+    ).lower()
+
+    # Generic accessory keywords
+    accessory_words = [
+        "adapter",
+        "charger",
+        "charging",
+        "case",
+        "cover",
+        "skin",
+        "protector",
+        "cable",
+        "dock",
+        "hub",
+        "stand",
+        "holder",
+        "mount",
+        "tripod",
+        "bag",
+        "sleeve",
+        "replacement",
+        "repair",
+        "sticker",
+        "remote",
+        "battery pack",
+        "power bank",
+        "cooler",
+        "mouse pad",
+        "screen guard",
+        "usb hub",
+        "type c",
+        "fast charger",
+        "wall charger",
+        "gan charger",
+        "power adapter"
+    ]
+
+    # Main product keywords
+    category_keywords = {
+
+        "laptop": [
+            "laptop",
+            "notebook",
+            "macbook",
+            "thinkpad",
+            "vivobook"
+        ],
+
+        "mobile": [
+            "phone",
+            "iphone",
+            "smartphone",
+            "galaxy",
+            "oneplus",
+            "pixel"
+        ],
+
+        "headphones": [
+            "headphone",
+            "earbuds",
+            "earphone",
+            "headset"
+        ],
+
+        "tablet": [
+            "tablet",
+            "ipad"
+        ],
+
+        "monitor": [
+            "monitor",
+            "display"
+        ],
+
+        "keyboard": [
+            "keyboard"
+        ],
+
+        "mouse": [
+            "mouse"
+        ],
+
+        "speaker": [
+            "speaker",
+            "soundbar"
+        ],
+
+        "camera": [
+            "camera",
+            "dslr",
+            "mirrorless"
+        ],
+
+        "smartwatch": [
+            "watch",
+            "smartwatch"
+        ]
+    }
+
+    primary_words = category_keywords.get(category, [])
+
+    filtered_rows = []
+
+    for _, row in df.iterrows():
+
+        title = str(
+            row.get("product_title", "")
+        ).lower()
+
+        # Detect accessories
+        # Detect accessory
+        is_accessory = False
+
+        for word in accessory_words:
+
+            if word in title:
+                is_accessory = True
+                break
+
+        # Detect real product
+        is_primary_product = any(
+            word in title
+            for word in primary_words
+        )
+
+        # Reject accessories immediately
+        if is_accessory:
+            continue
+
+        # Keep real products only
+        if is_primary_product:
+            filtered_rows.append(row)
+
+    df = pd.DataFrame(filtered_rows)
+
+    if df.empty:
+        return df
+    
+    # =========================
+# APPLY BUDGET FILTERS
+# =========================
+
+    budget_min = requirements.get("budget_min")
+    budget_max = requirements.get("budget_max")
+
+    # Convert prices safely
+    df["product_price"] = pd.to_numeric(
+        df["product_price"],
+        errors="coerce"
+    )
+
+    # Remove invalid prices
+    df = df.dropna(subset=["product_price"])
+
+    # Apply minimum budget
+    if budget_min is not None:
+
+        df = df[
+            df["product_price"] >= float(budget_min)
+        ]
+
+    # Apply maximum budget
+    if budget_max is not None:
+
+        df = df[
+            df["product_price"] <= float(budget_max)
+        ]
+
+    # Stop if empty
+    if df.empty:
+        return df
 
     use_case = requirements.get("use_case", "general").lower()
     weights = USE_CASE_WEIGHTS.get(use_case, DEFAULT_WEIGHTS)

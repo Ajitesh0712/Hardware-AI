@@ -24,7 +24,7 @@ def search_products(query: str, category: str = "laptop", budget_max: float = No
         "product_condition": "NEW"
     }
 
-    if budget_max:
+    if budget_max is not None:
         params["max_price"] = str(int(budget_max))
 
     try:
@@ -51,6 +51,9 @@ def search_products(query: str, category: str = "laptop", budget_max: float = No
             return []
 
         products = data.get("data", {}).get("products", [])
+        if not isinstance(products, list):
+            print("[Amazon API] Invalid products format")
+            return []
 
         #SAFE NORMALIZATION
         result = []
@@ -109,10 +112,13 @@ def get_product_reviews(asin: str) -> list:
 
 
 def _normalize_product(raw: dict) -> dict:
-    price_str = raw.get("product_price", "0")
+    price_str = str(
+        raw.get("product_price")
+        or "0"
+    )
 
 
-    if "$" in price_str:
+    if isinstance(price_str, str) and "$" in price_str:
         try:
             usd_value = float(price_str.replace("$", "").replace(",", "").strip())
             inr_value = int(usd_value * 83)  # conversion rate
