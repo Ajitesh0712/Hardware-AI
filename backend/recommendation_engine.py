@@ -212,7 +212,6 @@ def recommend(df: pd.DataFrame, requirements: dict, top_n: int = 5) -> pd.DataFr
             row.get("product_title", "")
         ).lower()
 
-        # Detect accessories
         # Detect accessory
         is_accessory = False
 

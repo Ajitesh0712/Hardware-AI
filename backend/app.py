@@ -27,14 +27,14 @@ except Exception as e:
     print(f"[WARN] DB init failed (check MySQL config): {e}")
 
 
-# ─── Serve Frontend ───────────────────────────────────────────────────────────
+#Serve Frontend
 
 @app.route("/")
 def index():
     return send_from_directory("../frontend", "index.html")
 
 
-# ─── Main Recommend Endpoint ──────────────────────────────────────────────────
+#Main Recommend Endpoint 
 
 @app.route("/api/recommend", methods=["POST"])
 def recommend_products():
@@ -209,7 +209,7 @@ def recommend_products():
     })
 
 
-# ─── Refine Search Endpoint ───────────────────────────────────────────────────
+#Refine Search Endpoint
 
 @app.route("/api/refine", methods=["POST"])
 def refine_search():
@@ -221,7 +221,7 @@ def refine_search():
     original_req = data.get("original_requirements", {})
     session_id = data.get("session_id", str(uuid.uuid4()))
 
-    # ─── STEP 1: Merge AI parsed requirements ───
+    #STEP 1: Merge AI parsed requirements
     try:
         new_req = parse_user_requirements(user_query)
         merged = {**original_req}
@@ -242,7 +242,7 @@ def refine_search():
 
     query_lower = user_query.lower()
 
-    # ─── STEP 2: CATEGORY (only if user mentions) ───
+    #STEP 2: CATEGORY
     if "laptop" in query_lower:
         merged["category"] = "laptop"
     elif "phone" in query_lower or "mobile" in query_lower:
@@ -268,7 +268,7 @@ def refine_search():
     if not merged.get("category"):
         merged["category"] = original_req.get("category", "laptop")
 
-    # ─── STEP 3: AI INTENT HANDLING ───
+    #STEP 3: AI INTENT HANDLING
 
     intent = new_req.get("intent")
 
@@ -294,7 +294,7 @@ def refine_search():
             merged["budget_max"] = new_req["budget_max"]
                 
 
-    # ─── STEP 4: MODIFIER HANDLING ───
+    #STEP 4: MODIFIER HANDLING
     modifiers = new_req.get("modifiers", [])
 
     if "gaming" in modifiers:
@@ -309,8 +309,8 @@ def refine_search():
     if "lightweight" in modifiers or "portable" in modifiers:
         merged.setdefault("priority_specs", {})["portability"] = True
 
-    # ─── STEP 5: BUILD SMART SEARCH QUERY ───
-   # ─── STEP 5: SMART QUERY REFINEMENT ───
+
+   # STEP 5: SMART QUERY REFINEMENT
 
     category = merged.get("category", "laptop")
 
@@ -323,9 +323,9 @@ def refine_search():
     query_lower = current_query.lower()
     
 
-# ==========================================
+
 # REMOVE OLD BUDGET FILTERS IF NEW ONE EXISTS
-# ==========================================
+
 
     budget_words = [
         "under",
@@ -351,51 +351,48 @@ def refine_search():
             clean_previous_query,
             flags=re.IGNORECASE
         ).strip()
-        # ==========================================
-        # Detect category/brand replacement
-        # ==========================================
 
-        replacement_keywords = [
-            "instead",
-            "change",
-            "switch",
-            "different"
-        ]
+    # Detect category/brand replacement
 
-        brands = [
-            "iphone",
-            "apple",
-            "samsung",
-            "oneplus",
-            "pixel",
-            "lenovo",
-            "asus",
-            "dell",
-            "hp",
-            "acer",
-            "msi",
-            "sony",
-            "boat",
-            "jbl"
-        ]
 
-        new_brand_detected = any(
-            brand in query_lower
-            for brand in brands
-        )
+    replacement_keywords = [
+        "instead",
+        "change",
+        "switch",
+        "different"
+    ]
 
-        replacement_detected = any(
-            word in query_lower
-            for word in replacement_keywords
-        )
+    brands = [
+        "iphone",
+        "apple",
+        "samsung",
+        "oneplus",
+        "pixel",
+        "lenovo",
+        "asus",
+        "dell",
+        "hp",
+        "acer",
+        "msi",
+        "sony",
+        "boat",
+        "jbl"
+    ]
 
-    # ==========================================
-    # Decide refinement mode
-    # ==========================================
+    new_brand_detected = any(
+        brand in query_lower
+        for brand in brands
+    )
 
- # ==========================================
+    replacement_detected = any(
+        word in query_lower
+        for word in replacement_keywords
+    )
+
+# Decide refinement mode
+
 # Detect NEW SEARCH vs REFINE
-# ==========================================
+
 
     categories = [
         "laptop",
@@ -441,9 +438,9 @@ def refine_search():
         for word in refine_words
     )
 
-    # ==========================================
+
     # FINAL DECISION
-    # ==========================================
+
 
     if replacement_detected:
         
@@ -469,9 +466,9 @@ def refine_search():
                 combined_words.append(word)
 
         combined_query = " ".join(combined_words)
-    # ==========================================
+
     # FINAL QUERY
-    # ==========================================
+
 
     search_query = combined_query.strip()
 
@@ -479,7 +476,7 @@ def refine_search():
 
     print("[REFINED QUERY]", search_query)
 
-    # ─── STEP 6: FETCH PRODUCTS ───
+    # STEP 6: FETCH PRODUCTS 
     raw_products = search_products(
         query=search_query,
         category=category,
@@ -501,12 +498,12 @@ def refine_search():
             page=1
         )
 
-    # ─── STEP 7: PROCESS + RANK ───
+    # STEP 7: PROCESS + RANK
     df = process_products(raw_products, merged)
     ranked_df = recommend(df, merged, top_n=6)
     products_list = products_to_dict_list(ranked_df)
 
-    # ─── STEP 8: LABELS ───
+    # STEP 8: LABELS
     for product in products_list[:3]:
         product["match_label"] = get_match_label(product.get("match_score", 0))
         product["pros"] = []
@@ -525,7 +522,7 @@ def refine_search():
         "summary": summary,
         "products": products_list
     })
-# ─── Interaction Logging ──────────────────────────────────────────────────────
+# Interaction Logging 
 
 @app.route("/api/interaction", methods=["POST"])
 def track_interaction():
