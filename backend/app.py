@@ -10,7 +10,9 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 
 from claude_ai import parse_user_requirements, generate_recommendation_summary, analyze_product_sentiment
-from amazon_api import search_products, get_product_reviews
+#from amazon_api import get_product_reviews
+from product_aggregator import search_products
+from product_aggregator import get_reviews
 from data_processor import process_products, products_to_dict_list
 from recommendation_engine import recommend, get_match_label
 from database import init_db, save_query, save_recommendations, log_interaction, upsert_product
@@ -164,7 +166,7 @@ def recommend_products():
         asin = product.get("asin")
         if asin:
             try:
-                reviews = get_product_reviews(asin)
+                reviews = get_reviews(product_url=product["product_url"])
                 sentiment_data = analyze_product_sentiment(reviews)
                 product["pros"] = sentiment_data.get("pros", [])
                 product["cons"] = sentiment_data.get("cons", [])
