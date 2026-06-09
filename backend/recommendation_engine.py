@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
-from data_processor import build_feature_vector
-from ml_model import predict_score
+from backend.data_processor import build_feature_vector
+from backend.ml_model import predict_score
 
 
 # Weights for each feature dimension based on use case priorities

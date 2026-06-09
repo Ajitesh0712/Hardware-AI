@@ -1,9 +1,23 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    mean_absolute_error,
+    r2_score
+)
+import os
 
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
-df = pd.read_csv("electronics.csv")
+csv_path = os.path.join(
+    BASE_DIR,
+    "electronics.csv"
+)
+
+df = pd.read_csv(csv_path)
 
 
 df["discount_price"] = (
@@ -154,12 +168,22 @@ X = np.array([
 y = df["target_score"].values
 
 
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+
 model = RandomForestRegressor(
     n_estimators=100,
     random_state=42
 )
 
-model.fit(X, y)
+model.fit(
+    X_train,
+    y_train
+)
 
 print("[ML] Model trained successfully.")
 

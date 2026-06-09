@@ -8,14 +8,12 @@ import uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
-
-from claude_ai import parse_user_requirements, generate_recommendation_summary, analyze_product_sentiment
 #from amazon_api import get_product_reviews
-from product_aggregator import search_products
-from product_aggregator import get_reviews
-from data_processor import process_products, products_to_dict_list
-from recommendation_engine import recommend, get_match_label
-from database import init_db, save_query, save_recommendations, log_interaction, upsert_product
+from backend.claude_ai import parse_user_requirements, generate_recommendation_summary, analyze_product_sentiment
+from backend.product_aggregator import search_products, get_reviews
+from backend.data_processor import process_products, products_to_dict_list
+from backend.recommendation_engine import recommend, get_match_label
+from backend.database import init_db, save_query, save_recommendations, log_interaction, upsert_product
 import re
 load_dotenv()
 

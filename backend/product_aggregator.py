@@ -1,4 +1,4 @@
-from scrapers.amazon_scraper import (
+from backend.scrapers.amazon_scraper import (
     search_amazon,
     get_product_details
 )
