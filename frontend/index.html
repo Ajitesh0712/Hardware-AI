@@ -490,7 +490,8 @@
 
 <script>
     // ── State ─────────────────────────────────────────────────────────────────
-    const API_BASE = "http://127.0.0.1:8000/api";    let products = [];
+    const API_BASE = "https://hardware-ai.onrender.com/api";
+    let products = [];
     let currentIdx = 0;
     let currentRequirements = {};
     let sessionId = localStorage.getItem("hw_session_id") || generateSessionId();
