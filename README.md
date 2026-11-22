@@ -1,120 +1,51 @@
-HardwareAI
-HardwareAI is an AI-powered electronic product recommendation system that allows users to search and refine product queries using natural language.
-Features
+# ElectronicsAI — FCDS Project Based Learning
 
+ElectronicsAI is a product discovery and recommendation prototype for electronics. It combines a seven-phase data science workflow with a Flask application that parses a shopping request, retrieves product listings, extracts comparable attributes, applies budget/category filters, and ranks candidate products.
 
-Natural language search (e.g., "gaming laptop under 1 lakh")
+## Project contents
 
+- `Data Science/01_data_understanding.ipynb` through `07_model_evaluation.ipynb`: the complete FCDS workflow, from data audit and cleaning through exploratory/statistical analysis, feature engineering, model development and final evaluation.
+- `backend/product_features.py`: the shared title classifier and feature extractor used by offline feature engineering and online inference.
+- `backend/model_artifacts/product_score.joblib`: the saved scikit-learn pipeline loaded by the app.
+- `backend/app.py`, `backend/data_processor.py`, `backend/recommendation_engine.py`: the web/API and ranking flow.
+- `frontend/index.html`: the browser interface.
+- `deliverables/`: lab presentation and project report.
 
-Conversational refinement (e.g., "cheaper", "better battery")
+## Run the app locally
 
+Use Python 3.11 or newer and install the compatible dependencies:
 
-AI-based requirement extraction using Gemini API
-
-
-Product data fetched from Amazon via RapidAPI
-
-
-Basic sentiment analysis from product reviews
-
-
-Recommendation engine for ranking products
-
-
-Tech Stack
-
-
-Backend: Python (Flask)
-
-
-AI: Google Gemini API
-
-
-Database: MySQL
-
-
-Frontend: HTML, CSS, JavaScript
-
-
-External APIs: RapidAPI (Amazon data)
-
-
-Project Structure
-backend/
-frontend/
-schema.sql
-requirements.txt
-.env.example
-.gitignore
-README.md
-Setup Instructions
-
-
-Clone the repository:
-git clone https://github.com/your-username/hardwareai.git
-cd hardwareai
-
-
-Create environment file:
-cp .env.example .env
-
-
-Add your API keys in .env:
-GEMINI_API_KEY=your_api_key_here
-RAPIDAPI_KEY=your_api_key_here
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=hardwareai
-
-
-Install dependencies:
+```bash
+python -m venv .venv
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env
+```
 
+Set `GEMINI_API_KEY` in `.env` for Gemini-based query parsing and summaries. The current product search/review adapter scrapes Amazon India pages, so the live path requires network access and may be affected by page changes, throttling, or access controls. MySQL persistence is optional; configure `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` when a database is available. Never commit `.env` or credentials.
 
-Run the backend server:
-python3 app.py
+Start from the repository root:
 
+```bash
+python -m backend.app
+```
 
-Open in browser:
-http://localhost:5001
+Open `http://127.0.0.1:5001`. Example requests include “gaming laptop under 60000”, “wireless earbuds”, and “phone with 8 GB RAM”. The backend also exposes `POST /api/recommend` and `POST /api/refine`.
 
+For deployment, the `Procfile` runs `gunicorn backend.app:app`; set the same environment variables in the deployment environment. The Flask development server is intended for a local demonstration.
 
-Usage Examples
+## FCDS workflow and findings
 
+The analysis uses 5,010 product records and retains all rows through feature engineering. It includes data understanding, cleaning, univariate and bivariate EDA, non-parametric statistical analysis, rule-based category/spec extraction, regression model comparison, and a grouped holdout evaluation. The project report documents the dataset caveats, methods, results, and presentation procedure.
 
-gaming laptop under 100000
+The learned regression target is a **proxy score** derived from rating, review-count popularity, and discount percentage. It is not a user satisfaction label, recommendation probability, or causal outcome. On the reserved 20% title-group holdout, the saved Random Forest achieved MAE 0.00494, RMSE 0.01142, and R² 0.9908. These strong values are expected in part because the predictors contain the same ingredients used to construct the proxy target; they demonstrate pipeline consistency, not real-world recommendation quality. Ranking also includes explicit use-case matching and is not simply the model prediction.
 
+## Model and live-data flow
 
-cheaper options
+The shared feature module preserves the same feature names/order for training and inference. The saved pipeline includes training-fitted missing-value imputation; it is loaded once when the backend imports and is not retrained per request. Live products retain missing ratings for the fitted imputer, and incomplete review evidence is shown as unavailable instead of fabricated claims.
 
+The offline training/evaluation workflow is reproducible from the notebooks. The external Amazon page, Gemini API, and MySQL service were not exercised as a connected end-to-end deployment during this project pass; the app integration was checked with representative scraper-shaped records. Live service behavior therefore depends on valid credentials, network access, and current external service behavior.
 
-better battery laptop
+## Rebuild the model
 
-
-lightweight laptop for students
-
-
-Future Improvements
-
-
-Fully AI-driven ranking system
-
-
-Support for multiple e-commerce platforms (Flipkart, etc.)
-
-
-User preference memory
-
-
-Advanced conversational interface
-
-
-Notes
-
-
-Do not upload .env file to GitHub
-
-
-Use .env.example as a template for environment variables
-
+Run notebooks 01–07 in order from the `Data Science/` directory. Phase 6 selects a model on grouped training/validation data and writes the model artifact; Phase 7 evaluates it once on the reserved grouped holdout. Do not use the holdout metrics to tune the model. Generated tables, plots, and the fitted artifact are stored under `Data Science/model_outputs/`, `Data Science/phase_outputs/`, and `backend/model_artifacts/`.

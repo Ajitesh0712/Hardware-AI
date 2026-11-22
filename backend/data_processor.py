@@ -1,196 +1,195 @@
+"""Normalize scraped products into the application's internal schema."""
+
+from __future__ import annotations
+
+import re
+
 import numpy as np
 import pandas as pd
-import re
+
+from backend.product_features import classify_product, extract_title_specs
+
+
+def _number(value):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return np.nan
+    if isinstance(value, (int, float, np.number)):
+        return float(value)
+    text = str(value).strip().replace(",", "").replace("₹", "")
+    match = re.search(r"\d+(?:\.\d+)?", text)
+    return float(match.group()) if match else np.nan
 
 
 def process_products(raw_products: list, requirements: dict) -> pd.DataFrame:
-    """
-    Main pipeline: takes raw Amazon products and requirements,
-    returns a clean, enriched DataFrame ready for the recommendation engine.
-    """
+    """Normalize scraper fields, clean values, add specs and apply budget."""
     if not raw_products:
         return pd.DataFrame()
 
-    df = pd.DataFrame(raw_products)
-    df = _clean_prices(df)
-    df = _clean_ratings(df)
-    df = _extract_specs_from_title(df)
-    df = _apply_budget_filter(df, requirements)
-    df = _compute_popularity_score(df)
-    df = df.reset_index(drop=True)
+    df = pd.DataFrame(raw_products).copy()
+    aliases = {
+        "product_title": ("product_title", "name", "title"),
+        "product_price": ("product_price", "discount_price", "price", "product_price_str"),
+        "product_star_rating": ("product_star_rating", "review_rating", "rating"),
+        "product_num_ratings": ("product_num_ratings", "no_of_ratings", "review_count"),
+    }
+    for target, sources in aliases.items():
+        if target not in df:
+            source = next((col for col in sources if col in df), None)
+            df[target] = df[source] if source else np.nan
 
-    return df
+    df["product_title"] = df["product_title"].fillna("").astype(str)
+    df["product_price"] = df["product_price"].map(_number)
+    df["product_star_rating"] = df["product_star_rating"].map(_number).clip(0, 5)
+    df.loc[df["product_star_rating"] <= 0, "product_star_rating"] = np.nan
+    df["product_num_ratings"] = df["product_num_ratings"].map(_number).clip(lower=0)
+    df["product_num_ratings_missing"] = df["product_num_ratings"].isna()
 
+    # Keep listings with a usable price. Missing ratings remain missing so the
+    # saved model's training-fitted imputer handles them identically at inference.
+    df = df[df["product_price"].notna() & (df["product_price"] > 0)].copy()
+    if df.empty:
+        return df.reset_index(drop=True)
+    df["product_num_ratings"] = df["product_num_ratings"].fillna(0)
 
-def _clean_prices(df: pd.DataFrame) -> pd.DataFrame:
-    """Ensure price is a float, remove nulls and zero-price items."""
-    df["product_price"] = pd.to_numeric(df["product_price"], errors="coerce")
-    df = df[df["product_price"].notna()]
-    df = df[df["product_price"] > 0]
-    return df
-
-
-def _clean_ratings(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize ratings to 0-5 scale, fill missing with median."""
-    df["product_star_rating"] = pd.to_numeric(df["product_star_rating"], errors="coerce")
-    median_rating = df["product_star_rating"].median()
-    if pd.isna(median_rating):
-        median_rating = 3.5
-    df["product_star_rating"] = df["product_star_rating"].fillna(median_rating)
-    df["product_star_rating"] = df["product_star_rating"].clip(0, 5)
-
-    df["product_num_ratings"] = pd.to_numeric(df["product_num_ratings"], errors="coerce").fillna(0)
-    return df
-
-
-def _extract_specs_from_title(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Parse common specs from product titles using regex.
-    Extracts: RAM, storage, display size, processor hints.
-    """
-    titles = df["product_title"].fillna("").str.lower()
-
-    # RAM: e.g. "16GB RAM", "32 GB Memory"
-    df["extracted_ram_gb"] = titles.str.extract(r'(\d+)\s*gb\s*(?:ram|memory|ddr)', expand=False)
-    df["extracted_ram_gb"] = pd.to_numeric(df["extracted_ram_gb"], errors="coerce")
-
-    # Storage: e.g. "512GB SSD", "1TB HDD", "2TB NVMe"
-    storage_match = titles.str.extract(r'(\d+(?:\.\d+)?)\s*(tb|gb)\s*(?:ssd|hdd|nvme|storage|emmc)', expand=True)
-    def _to_gb(row):
-        if pd.isna(row[0]):
-            return np.nan
-        val = float(row[0])
-        return val * 1024 if str(row[1]).lower() == "tb" else val
-    df["extracted_storage_gb"] = storage_match.apply(_to_gb, axis=1)
-
-    # Display size: e.g. "15.6 inch", "13.3""
-    df["extracted_display_inch"] = titles.str.extract(r'(\d+\.?\d*)\s*(?:inch|"|-inch|\'\')', expand=False)
-    df["extracted_display_inch"] = pd.to_numeric(df["extracted_display_inch"], errors="coerce")
-
-    # GPU hint
-    df["has_dedicated_gpu"] = titles.str.contains(
-        r'rtx|gtx|radeon|nvidia|geforce|arc\s+\w+\s+gpu', regex=True
+    df["product_category"] = df["product_title"].map(classify_product)
+    specs = df.apply(
+        lambda row: extract_title_specs(row["product_title"], row["product_category"]),
+        axis=1,
+        result_type="expand",
     )
+    df = pd.concat([df, specs.add_prefix("extracted_")], axis=1)
 
-    # Processor hint
-    df["processor_hint"] = titles.str.extract(
-        r'(i3|i5|i7|i9|ryzen\s*\d|snapdragon|apple\s*m\d|m1|m2|m3|celeron|pentium)', expand=False
-    ).fillna("unknown")
+    # Exact model names/numbers are hard constraints. A query for an RTX 4060
+    # must never rank RTX 4050/4070 laptops as if they were matches.
+    for requested_model in requirements.get("required_models", []):
+        model = str(requested_model).strip().lower()
+        if not model:
+            continue
+        escaped = re.escape(model)
+        escaped = re.sub(r"\\\s+", r"[\\s-]*", escaped)
+        escaped = escaped.replace(r"\-", r"[ -]?")
+        if re.fullmatch(r"m[1-5](?:\s+(?:pro|max|ultra))?", model):
+            escaped += r"(?![a-z0-9])"
+        if re.search(r"\b(?:rtx|gtx)\s*\d{3,4}$", model):
+            escaped += r"(?!\s*(?:ti|super)\b)"
+        elif re.search(r"\brx\s*\d{3,4}$", model):
+            escaped += r"(?!\s*(?:xt|xtx)\b)"
+        pattern = re.compile(rf"(?<![a-z0-9]){escaped}(?![a-z0-9])", re.I)
+        df = df[df["product_title"].map(lambda title: bool(pattern.search(title)))].copy()
+        if df.empty:
+            return df.reset_index(drop=True)
 
-    return df
+    priority = requirements.get("priority_specs") or {}
+    for key, wanted in (("extracted_ram_gb", priority.get("ram_gb")), ("extracted_storage_gb", priority.get("storage_gb"))):
+        if wanted is not None:
+            available = pd.to_numeric(df[key], errors="coerce")
+            df = df[available.isna() | (available >= float(wanted))].copy()
+            if df.empty:
+                return df.reset_index(drop=True)
 
+    budget_min = _number(requirements.get("budget_min")) if requirements.get("budget_min") is not None else np.nan
+    budget_max = _number(requirements.get("budget_max")) if requirements.get("budget_max") is not None else np.nan
+    if np.isfinite(budget_min):
+        df = df[df["product_price"] >= budget_min]
+    if np.isfinite(budget_max):
+        df = df[df["product_price"] <= budget_max]
 
-def _apply_budget_filter(df: pd.DataFrame, requirements: dict) -> pd.DataFrame:
-    """Filter products within the user's budget range."""
-    budget_min = requirements.get("budget_min")
-    budget_max = requirements.get("budget_max")
-
-    if budget_max:
-        # Allow 10% over budget to catch good deals
-        df = df[df["product_price"] <= budget_max * 1.10]
-    if budget_min:
-        df = df[df["product_price"] >= budget_min * 0.90]
-
-    return df
-
-
-def _compute_popularity_score(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute a normalized popularity score combining rating and review count.
-    Uses Bayesian average to avoid bias from products with very few reviews.
-    """
-    C = df["product_star_rating"].mean()  # global mean
-    m = df["product_num_ratings"].quantile(0.25)  # minimum threshold
-
+    popularity_rating = df["product_star_rating"].fillna(df["product_star_rating"].median()).fillna(3.5)
+    mean_rating = float(popularity_rating.mean()) if not df.empty else 3.5
+    threshold = float(df["product_num_ratings"].quantile(0.25)) if not df.empty else 0.0
+    threshold = max(threshold, 1.0)
     df["popularity_score"] = (
-        (df["product_num_ratings"] / (df["product_num_ratings"] + m)) * df["product_star_rating"] +
-        (m / (df["product_num_ratings"] + m)) * C
-    )
-
-    # Normalize to 0-1
-    min_pop = df["popularity_score"].min()
-    max_pop = df["popularity_score"].max()
-    if max_pop > min_pop:
-        df["popularity_score"] = (df["popularity_score"] - min_pop) / (max_pop - min_pop)
-    else:
-        df["popularity_score"] = 0.5
-
-    return df
+        df["product_num_ratings"] / (df["product_num_ratings"] + threshold) * popularity_rating
+        + threshold / (df["product_num_ratings"] + threshold) * mean_rating
+    ) / 5.0
+    for flag in ("is_best_seller", "is_amazon_choice"):
+        if flag not in df:
+            df[flag] = False
+        df[flag] = df[flag].map(
+            lambda value: value.strip().lower() in {"true", "1", "yes"}
+            if isinstance(value, str)
+            else bool(value) if pd.notna(value) else False
+        )
+    return df.reset_index(drop=True)
 
 
 def build_feature_vector(product_row: pd.Series, requirements: dict) -> np.ndarray:
-    """
-    Build a numerical feature vector for a product to use in ML scoring.
-    Returns array: [price_score, rating_score, ram_match, storage_match, gpu_match, display_match]
-    """
-    budget_max = requirements.get("budget_max") or product_row["product_price"] * 1.5
-    budget_max = max(budget_max, 1)
+    """Return intent match dimensions used by similarity and ranking."""
+    price = float(product_row.get("product_price", 0) or 0)
+    budget_max = _number(requirements.get("budget_max")) if requirements.get("budget_max") is not None else price * 1.5
+    if not np.isfinite(budget_max) or budget_max <= 0:
+        budget_max = max(price * 1.5, 1.0)
+    price_score = float(np.clip(1 - price / budget_max, 0, 1))
+    rating_value = product_row.get("product_star_rating", np.nan)
+    rating_score = float(np.clip(rating_value, 0, 5) / 5) if pd.notna(rating_value) else 0.5
 
-    # Price score: lower price within budget = better score
-    price_ratio = product_row["product_price"] / budget_max
-    price_score = max(0, 1 - price_ratio)  # 1.0 = very cheap, 0 = at/over budget
+    priority = requirements.get("priority_specs") or {}
+    def ratio_score(key, requested, neutral=0.5):
+        available = product_row.get(key, np.nan)
+        if requested and pd.notna(available):
+            return float(np.clip(float(available) / float(requested), 0, 1))
+        return neutral
 
-    # Rating score (normalized)
-    rating_score = product_row["product_star_rating"] / 5.0
-
-    # RAM match
-    req_ram = requirements.get("priority_specs", {}).get("ram_gb")
-    extracted_ram = product_row.get("extracted_ram_gb", np.nan)
-    if req_ram and not pd.isna(extracted_ram):
-        ram_score = min(extracted_ram / req_ram, 1.5) / 1.5  # capped at 1.5x required
-    else:
-        ram_score = 0.5  # neutral if unknown
-
-    # Storage match
-    req_storage = requirements.get("priority_specs", {}).get("storage_gb")
-    extracted_storage = product_row.get("extracted_storage_gb", np.nan)
-    if req_storage and not pd.isna(extracted_storage):
-        storage_score = min(extracted_storage / req_storage, 2.0) / 2.0
-    else:
-        storage_score = 0.5
-
-    # GPU match
-    req_gpu = requirements.get("priority_specs", {}).get("gpu_required", False)
-    has_gpu = product_row.get("has_dedicated_gpu", False)
-    gpu_score = 1.0 if (req_gpu and has_gpu) else (0.5 if not req_gpu else 0.2)
-
-    # Display match
-    req_display = requirements.get("priority_specs", {}).get("display_size")
-    extracted_display = product_row.get("extracted_display_inch", np.nan)
-    if req_display and not pd.isna(extracted_display):
-        display_score = max(0, 1 - abs(extracted_display - req_display) / req_display)
-    else:
-        display_score = 0.5
-
-    # Popularity
-    pop_score = product_row.get("popularity_score", 0.5)
-
-    return np.array([price_score, rating_score, ram_score, storage_score, gpu_score, display_score, pop_score])
+    ram_score = ratio_score("extracted_ram_gb", priority.get("ram_gb"))
+    storage_score = ratio_score("extracted_storage_gb", priority.get("storage_gb"))
+    gpu_required = bool(priority.get("gpu_required"))
+    has_gpu = bool(re.search(r"\b(?:rtx|gtx|geforce|radeon)\b", str(product_row.get("product_title", "")), re.I))
+    gpu_score = 1.0 if has_gpu else (0.2 if gpu_required else 0.5)
+    display = product_row.get("extracted_screen_inches", np.nan)
+    requested_display = priority.get("display_size")
+    display_score = float(np.clip(1 - abs(float(display) - float(requested_display)) / float(requested_display), 0, 1)) if requested_display and pd.notna(display) and float(requested_display) > 0 else 0.5
+    popularity = float(np.clip(product_row.get("popularity_score", 0.5) or 0.5, 0, 1))
+    return np.array([price_score, rating_score, ram_score, storage_score, gpu_score, display_score, popularity])
 
 
 def products_to_dict_list(df: pd.DataFrame) -> list:
-    """Convert DataFrame to list of clean dicts for JSON serialization."""
     result = []
     for _, row in df.iterrows():
+        def number_or(value, default=0.0):
+            return float(value) if pd.notna(value) else default
+        def text_or_empty(value):
+            return "" if value is None or pd.isna(value) else str(value)
+        def spec_text(key, suffix=""):
+            value = row.get(f"extracted_{key}", np.nan)
+            if key == "storage_gb" and pd.notna(value) and value >= 1024 and value % 1024 == 0:
+                return f"{value / 1024:g} TB"
+            return f"{value:g}{suffix}" if pd.notna(value) else "N/A"
         result.append({
-            "asin": row.get("asin", ""),
-            "product_title": row.get("product_title", ""),
-            "product_price": float(row.get("product_price", 0)),
-            "product_price_str": f"${row.get('product_price', 0):,.2f}",
-            "product_star_rating": float(row.get("product_star_rating", 0)),
-            "product_num_ratings": int(row.get("product_num_ratings", 0)),
-            "product_url": row.get("product_url", ""),
-            "product_photo": row.get("product_photo", ""),
+            "asin": text_or_empty(row.get("asin", "")),
+            "product_title": text_or_empty(row.get("product_title", "")),
+            "product_price": number_or(row.get("product_price")),
+            "product_price_str": f"₹{number_or(row.get('product_price')):,.0f}",
+            "product_star_rating": number_or(row.get("product_star_rating"), default=None),
+            "product_num_ratings": (
+                None if bool(row.get("product_num_ratings_missing", False))
+                else int(number_or(row.get("product_num_ratings")))
+            ),
+            "product_url": text_or_empty(row.get("product_url", "")),
+            "product_photo": text_or_empty(row.get("product_photo", "")),
             "is_best_seller": bool(row.get("is_best_seller", False)),
             "is_amazon_choice": bool(row.get("is_amazon_choice", False)),
+            "product_category": text_or_empty(row.get("product_category", "Other / Unclassified")),
             "specs": {
-                "RAM": f"{int(row['extracted_ram_gb'])}GB" if not pd.isna(row.get("extracted_ram_gb", float("nan"))) else "N/A",
-                "Storage": f"{int(row['extracted_storage_gb'])}GB" if not pd.isna(row.get("extracted_storage_gb", float("nan"))) else "N/A",
-                "Display": f"{row['extracted_display_inch']:.1f}\"" if not pd.isna(row.get("extracted_display_inch", float("nan"))) else "N/A",
-                "GPU": "Dedicated" if row.get("has_dedicated_gpu") else "Integrated",
-                "Processor": str(row.get("processor_hint", "N/A")).title()
+                "RAM": spec_text("ram_gb", "GB"),
+                "Storage": spec_text("storage_gb", "GB"),
+                "Battery": spec_text("battery_mah", " mAh"),
+                "Display": spec_text("screen_inches", '"'),
+                "Charging": spec_text("charging_w", "W"),
+                "Refresh rate": spec_text("refresh_rate_hz", " Hz"),
+                "Graphics": _friendly_graphics_name(str(row.get("product_title", ""))),
             },
-            "match_score": float(row.get("match_score", 0)),
-            "popularity_score": float(row.get("popularity_score", 0))
+            "match_score": number_or(row.get("match_score")),
+            "model_score": number_or(row.get("model_score")),
+            "popularity_score": number_or(row.get("popularity_score")),
         })
     return result
+
+
+def _friendly_graphics_name(title: str) -> str:
+    match = re.search(r"\b(?:geforce\s+)?(rtx|gtx)\s*(\d{3,4})(\s*(?:ti|super))?\b|\b(?:radeon\s+)?(rx)\s*(\d{3,4})(\s*(?:xtx?|xt))?\b", title, re.I)
+    if not match:
+        return "Dedicated graphics" if re.search(r"\b(?:geforce|radeon|discrete graphics)\b", title, re.I) else "Not listed"
+    family = match.group(1) or match.group(4)
+    number = match.group(2) or match.group(5)
+    suffix = (match.group(3) or match.group(6) or "").strip()
+    return f"{family.upper()} {number}{(' ' + suffix.title()) if suffix else ''}"

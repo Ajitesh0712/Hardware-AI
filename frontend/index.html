@@ -338,27 +338,27 @@
 <!-- LANDING VIEW -->
 <div id="landing-view" class="hero-gradient hide-scrollbar">
     <div style="text-align: center; margin-bottom: 3rem;">
-        <div class="badge">v2.0 AI-Powered Engine</div>
+        <div class="badge">Simple electronics help</div>
         <h1>Hardware<span>AI</span></h1>
         <p style="color: var(--text-gray); font-size: 1.1rem; max-width: 500px; margin: 0 auto;">
-            Professional-grade hardware intelligence. Describe your workflow to generate a precision configuration.
+            Tell us what you need. We’ll find options that fit your budget and how you plan to use them.
         </p>
     </div>
 
     <div class="input-container glass">
-        <textarea id="firstInput" placeholder="e.g., I need a laptop under $1500 for coding and some gaming, preferably with 16GB RAM..."></textarea>
+        <textarea id="firstInput" placeholder="For example: a laptop for gaming under ₹80,000, or headphones for travel..."></textarea>
         <div class="input-footer">
-            <span style="font-size: 10px; color: #4b5563;" class="mono" id="status-text">READY_FOR_INPUT // SYSTEM_IDLE</span>
+            <span style="font-size: 10px; color: #4b5563;" id="status-text">Ready when you are</span>
             <button id="generateBtn" onclick="triggerSearch()" class="btn-primary">
-                Generate Build <i class="fas fa-bolt-lightning" style="margin-left: 8px;"></i>
+                Find products <i class="fas fa-arrow-right" style="margin-left: 8px;"></i>
             </button>
         </div>
     </div>
 
     <div class="history-section">
         <div style="display: flex; justify-content: space-between; margin-bottom: 2rem;">
-            <h3 style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3em;">Previous Sessions</h3>
-            <button onclick="clearHistory()" style="background:none; border:none; color: #475569; font-size: 10px; cursor: pointer;">PURGE HISTORY</button>
+            <h3 style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.3em;">Past searches</h3>
+            <button onclick="clearHistory()" style="background:none; border:none; color: #475569; font-size: 10px; cursor: pointer;">Clear history</button>
         </div>
         <div id="historyList" class="history-grid"></div>
     </div>
@@ -386,13 +386,13 @@
     <aside>
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--glass-border);">
             <button onclick="goHome()" style="background:none; border:none; color: #64748b; font-weight: bold; cursor: pointer; font-size: 11px;">
-                <i class="fas fa-chevron-left"></i> COMMAND CENTER
+                <i class="fas fa-chevron-left"></i> START OVER
             </button>
         </div>
         <div id="chatHistory" class="hide-scrollbar" style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column;"></div>
         <div style="padding: 1.5rem; background: rgba(0,0,0,0.3);">
             <div class="glass" style="border-radius: 1rem; display: flex; align-items: center; padding-right: 1rem;">
-                <input id="sidebarInput" type="text" placeholder="Refine parameters..."
+                <input id="sidebarInput" type="text" placeholder="Change budget, type, or use..."
                     style="background:transparent; border:none; color:white; padding: 1rem; flex: 1; outline:none;"
                     onkeypress="if(event.key === 'Enter') refineSearch()">
                 <i class="fas fa-paper-plane" style="color: var(--blue-primary); cursor: pointer;" onclick="refineSearch()"></i>
@@ -412,14 +412,14 @@
                 
                 <div style="display: flex; flex-direction: column; justify-content: center;">
                     <div class="score-gauge">
-                        <div class="score-circle" id="p-gauge">0%</div>
+                        <div class="score-circle" id="p-gauge">Good fit</div>
                         <div>
                             <span class="match-badge tag-top" id="p-match-label" style="margin-bottom: 4px;">TOP MATCH</span>
-                            <div style="font-size: 10px; color: var(--text-gray); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">AI Validated Compatibility</div>
+                            <div style="font-size: 10px; color: var(--text-gray); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">How well it fits your needs</div>
                         </div>
                     </div>
 
-                    <div style="font-size: 10px; color: #475569; margin-bottom: 0.5rem;" class="mono" id="p-asin"></div>
+                    <div style="display:none;" id="p-asin"></div>
                     <h2 id="p-name" class="short-title"></h2>
                     
                     <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
@@ -437,7 +437,7 @@
                     <div style="margin-top: 1.5rem;">
                         <a id="p-buy-link" href="#" target="_blank" style="text-decoration: none;">
                             <button class="btn-primary" style="width: 100%; padding: 1.2rem; font-size: 1rem;">
-                                VIEW ON AMAZON <i class="fas fa-arrow-right" style="margin-left: 10px;"></i>
+                                See price and availability <i class="fas fa-arrow-right" style="margin-left: 10px;"></i>
                             </button>
                         </a>
                     </div>
@@ -454,23 +454,34 @@
                 </div>
                 <div class="insight-card cons-card">
                     <h4 style="color: #ef4444; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1rem; font-weight: 800;">
-                        <i class="fas fa-exclamation-triangle mr-2"></i> Trade-offs
+                        <i class="fas fa-exclamation-triangle mr-2"></i> Things to know
                     </h4>
                     <ul id="p-cons" style="list-style: none; font-size: 13px; color: #cbd5e1; line-height: 1.8;"></ul>
+                </div>
+                <div class="insight-card" style="grid-column: 1 / -1;">
+                    <h4 style="color: var(--blue-primary); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1rem; font-weight: 800;">
+                        <i class="fas fa-comment-dots mr-2"></i> Customer comments
+                    </h4>
+                    <ul id="p-reviews" style="list-style: disc; padding-left: 1.25rem; font-size: 13px; color: #cbd5e1; line-height: 1.8;"></ul>
                 </div>
             </div>
         </div>
 
+        <div id="empty-results" class="hidden" style="max-width: 700px; margin: 8vh auto; padding: 2.5rem; text-align: center;">
+            <h2 style="font-size: 1.5rem; margin-bottom: 0.75rem;">No matches this time</h2>
+            <p style="color: var(--text-gray); line-height: 1.7;">Try raising your budget, changing the model, or asking for a different kind of product.</p>
+        </div>
+
         <!-- Bottom Navigation Bar (Unchanged) -->
-        <div style="position: fixed; bottom: 0; right: 0; width: 75%; height: 100px; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: space-between; padding: 0 4rem; border-top: 1px solid var(--glass-border);">
+        <div id="results-nav" style="position: fixed; bottom: 0; right: 0; width: 75%; height: 100px; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: space-between; padding: 0 4rem; border-top: 1px solid var(--glass-border);">
             <div style="display: flex; gap: 3rem;">
                 <div>
-                    <p style="font-size: 8px; color: #475569; font-weight: bold;">MATCH SCORE</p>
+                    <p style="font-size: 8px; color: #475569; font-weight: bold;">FIT FOR YOU</p>
                     <p class="mono" style="color: var(--blue-primary);" id="bottom-score">—</p>
                 </div>
                 <div>
-                    <p style="font-size: 8px; color: #475569; font-weight: bold;">COMPARISON</p>
-                    <p class="mono">Item <span id="current-idx">1</span> of <span id="total-count">0</span></p>
+                    <p style="font-size: 8px; color: #475569; font-weight: bold;">OPTIONS</p>
+                    <p class="mono">Option <span id="current-idx">1</span> of <span id="total-count">0</span></p>
                 </div>
                 <div>
                     <p style="font-size: 8px; color: #475569; font-weight: bold;">CATEGORY</p>
@@ -479,7 +490,7 @@
             </div>
             <div style="display: flex; gap: 1rem;">
                 <button onclick="prevProduct()" class="glass" style="width: 50px; height: 50px; border-radius: 1rem; color: white; cursor: pointer; border: none;"><i class="fas fa-chevron-left"></i></button>
-                <button onclick="nextProduct()" class="btn-primary">NEXT BUILD <i class="fas fa-chevron-right" style="margin-left: 6px;"></i></button>
+                <button onclick="nextProduct()" class="btn-primary">NEXT OPTION <i class="fas fa-chevron-right" style="margin-left: 6px;"></i></button>
             </div>
         </div>
     </main>
@@ -490,7 +501,7 @@
 
 <script>
     // ── State ─────────────────────────────────────────────────────────────────
-    const API_BASE = "https://hardware-ai.onrender.com/api";
+    const API_BASE = `${window.location.origin}/api`;
     let products = [];
     let currentIdx = 0;
     let currentRequirements = {};
@@ -558,11 +569,11 @@
         log.innerHTML = "";
 
         const logs = [
-            "> Booting NLP kernel...",
-            "> Parsing workflow requirements...",
-            "> Querying Amazon product database...",
-            "> Running ML scoring engine...",
-            "> Analyzing sentiment & reviews..."
+            "Understanding what you need...",
+            "Looking for matching products...",
+            "Checking your budget...",
+            "Putting the closest options first...",
+            "Checking ratings and reviews..."
         ];
 
         let logIndex = 0;
@@ -615,6 +626,9 @@
                     currentIdx = 0;
 
                     document.getElementById("split-view").style.display = "flex";
+                    document.getElementById("product-content").classList.remove("hidden");
+                    document.getElementById("results-nav").classList.remove("hidden");
+                    document.getElementById("empty-results").classList.add("hidden");
                     document.getElementById("chatHistory").innerHTML = "";
                     document.getElementById("total-count").innerText = products.length;
 
@@ -658,7 +672,7 @@
 
         addChatMessage("user", val);
         input.value = "";
-        addChatMessage("ai", "Re-calculating benchmarks based on updated parameters...");
+        addChatMessage("ai", "Updating your options...");
 
         try {
             const response = await fetch(`${API_BASE}/refine`, {
@@ -687,16 +701,24 @@
                 products = data.products;
                 currentRequirements = data.requirements || currentRequirements;
                 currentIdx = 0;
+                document.getElementById("product-content").classList.remove("hidden");
+                document.getElementById("results-nav").classList.remove("hidden");
+                document.getElementById("empty-results").classList.add("hidden");
                 document.getElementById("total-count").innerText = products.length;
                 addChatMessage("ai", data.summary || `Updated: ${products.length} refined results.`);
                 updateProductUI();
             } else {
-                addChatMessage("ai", "No products found for that refinement. Try different parameters.");
-                showToast("No products matched your refined query.");
+                products = [];
+                currentRequirements = data.requirements || currentRequirements;
+                document.getElementById("total-count").innerText = "0";
+                document.getElementById("product-content").classList.add("hidden");
+                document.getElementById("results-nav").classList.add("hidden");
+                document.getElementById("empty-results").classList.remove("hidden");
+                addChatMessage("ai", "I couldn't find a match. Try raising your budget, changing the model, or removing a requirement.");
             }
         } catch (e) {
-            addChatMessage("ai", "Error refining search. Please try again.");
-            showToast(e.message || "Error refining search.");
+            addChatMessage("ai", "I couldn't update those options. Try another budget or product type.");
+            showToast("I couldn't update those options. Please try again.");
         }
     }
 
@@ -707,9 +729,11 @@
 
         // Name Truncation (Keep it clean and short)
         const rawTitle = p.product_title || "Unknown Product";
-        const shortTitle = rawTitle.split(',')[0].split('|')[0].split('(')[0].trim().substring(0, 80);
+        let shortTitle = rawTitle.split(',')[0].split('|')[0].split('(')[0].trim();
+        shortTitle = shortTitle.split(/\s+(?:Intel\s+Core|Core\s+i[3579]|Ryzen\s+[3579]|AMD\s+Ryzen|NVIDIA|GeForce|RTX|GTX|Radeon)\b/i)[0].trim();
+        shortTitle = shortTitle.substring(0, 70) || rawTitle.substring(0, 70);
         document.getElementById("p-name").innerText = shortTitle;
-        document.getElementById("p-asin").innerText = `ASIN: ${p.asin || "N/A"}`;
+        document.getElementById("p-asin").innerText = "";
 
         // Price Logic
         let price = p.product_price;
@@ -731,7 +755,9 @@
         // Match Score Gauge
         const score = Math.round(p.match_score || 0);
         const gauge = document.getElementById("p-gauge");
-        gauge.innerText = `${score}%`;
+        gauge.innerText = p.match_label || "Good fit";
+        gauge.style.fontSize = p.match_label === "Matches your model" ? "9px" : "12px";
+        gauge.style.fontFamily = "'Plus Jakarta Sans', sans-serif";
         
         // Dynamic Color for Gauge
         if(score > 80) { gauge.style.borderColor = "#22c55e"; gauge.style.color = "#22c55e"; }
@@ -739,22 +765,26 @@
         else { gauge.style.borderColor = "#ef4444"; gauge.style.color = "#ef4444"; }
         
         document.getElementById("p-match-label").innerText = p.match_label || "TOP MATCH";
-        document.getElementById("bottom-score").innerText = `${score}%`;
-        document.getElementById("bottom-category").innerText = currentRequirements.category?.toUpperCase() || "—";
+        document.getElementById("bottom-score").innerText = p.match_label || "Good fit";
+        const simpleCategories = {"laptop":"Laptops", "mobile":"Phones", "headphones":"Headphones", "tablet":"Tablets", "monitor":"Monitors", "keyboard":"Keyboards", "mouse":"Mice", "speaker":"Speakers", "camera":"Cameras", "smartwatch":"Watches", "television":"TVs", "printer":"Printers", "networking":"Networking devices", "power_banks":"Power banks", "storage":"Storage devices", "charger":"Chargers", "computer_components":"Computer parts"};
+        document.getElementById("bottom-category").innerText = simpleCategories[currentRequirements.category] || "Products";
 
         // Tags
         document.getElementById("p-bestseller").classList.toggle("hidden", !p.is_best_seller);
         document.getElementById("p-choice").classList.toggle("hidden", !p.is_amazon_choice);
 
         // Stars
-        const rating = p.product_star_rating || 0;
-        const fullStars = Math.floor(rating);
-        const halfStar = rating % 1 >= 0.5;
+        const rating = Number.isFinite(p.product_star_rating) ? p.product_star_rating : null;
+        const fullStars = rating === null ? 0 : Math.floor(rating);
+        const halfStar = rating !== null && rating % 1 >= 0.5;
         let starsHtml = "";
         for (let i = 0; i < fullStars; i++) starsHtml += '<i class="fas fa-star"></i>';
         if (halfStar) starsHtml += '<i class="fas fa-star-half-alt"></i>';
         document.getElementById("p-stars").innerHTML = starsHtml;
-        document.getElementById("p-rating-count").innerText = `${rating.toFixed(1)} (${(p.product_num_ratings || 0).toLocaleString()} reviews)`;
+        const reviewCount = Number.isFinite(p.product_num_ratings) ? p.product_num_ratings : null;
+        document.getElementById("p-rating-count").innerText = rating === null
+            ? "Rating unavailable"
+            : `${rating.toFixed(1)} (${reviewCount === null ? "rating count unavailable" : `${reviewCount.toLocaleString()} ratings`})`;
 
         // Image
         const img = document.getElementById("p-img");
@@ -772,13 +802,13 @@
 
         // Compact Specs Box
         const specs = p.specs || {};
-        const importantKeys = ['CPU', 'RAM', 'Storage', 'GPU', 'Display', 'Screen Size', 'Battery'];
+        const importantKeys = ['RAM', 'Storage', 'Graphics', 'Display', 'Screen Size', 'Battery'];
         const specHtml = Object.entries(specs)
-            .filter(([k, v]) => importantKeys.some(key => k.toUpperCase().includes(key.toUpperCase())) && v !== "N/A")
+            .filter(([k, v]) => importantKeys.some(key => k.toUpperCase().includes(key.toUpperCase())) && v !== "N/A" && v !== "Not listed")
             .slice(0, 6)
             .map(([k, v]) => `
                 <div class="spec-pill">
-                    <span class="spec-lbl">${k}</span>
+                    <span class="spec-lbl">${({"RAM":"Memory", "Storage":"Storage space", "Graphics":"Graphics", "Display":"Screen", "Battery":"Battery"}[k] || k)}</span>
                     <span class="spec-val">${v}</span>
                 </div>
             `).join("");
@@ -786,10 +816,26 @@
         document.getElementById("p-compact-specs").innerHTML = specHtml || '<div style="font-size: 11px; color: #64748b; padding: 1rem;">No compact specs available. See store page.</div>';
 
         // Pros & Cons
-        const pros = p.pros?.length ? p.pros : ["Great performance for the price", "Solid build quality"];
-        const cons = p.cons?.length ? p.cons : ["Check reviews for more details"];
+        const pros = p.pros?.length ? p.pros : ["No customer review summary is available yet."];
+        const cons = p.cons?.length ? p.cons : ["Read the latest customer reviews on the store page."];
         document.getElementById("p-pros").innerHTML = pros.map(i => `<li style="margin-bottom: 8px;"><i class="fas fa-check text-green-500 mr-2"></i> ${i}</li>`).join("");
         document.getElementById("p-cons").innerHTML = cons.map(i => `<li style="margin-bottom: 8px;"><i class="fas fa-times text-red-500 mr-2"></i> ${i}</li>`).join("");
+
+        const reviewList = document.getElementById("p-reviews");
+        reviewList.replaceChildren();
+        const reviewSnippets = Array.isArray(p.reviews) ? p.reviews.filter(review => typeof review === "string" && review.trim()) : [];
+        if (reviewSnippets.length) {
+            reviewSnippets.slice(0, 5).forEach(review => {
+                const li = document.createElement("li");
+                li.style.marginBottom = "8px";
+                li.textContent = review;
+                reviewList.appendChild(li);
+            });
+        } else {
+            const li = document.createElement("li");
+            li.textContent = "Customer comments aren't available here right now. You can check them on the store page.";
+            reviewList.appendChild(li);
+        }
 
         // Navigation counter
         document.getElementById("current-idx").innerText = currentIdx + 1;

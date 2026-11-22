@@ -5,11 +5,18 @@ Main Flask backend for HardwareAI Electronic Recommendation System.
 
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 #from amazon_api import get_product_reviews
-from backend.claude_ai import parse_user_requirements, generate_recommendation_summary, analyze_product_sentiment
+from backend.claude_ai import (
+    generate_recommendation_summary,
+    infer_category_from_text,
+    parse_budget_limits,
+    parse_user_requirements,
+    _remove_budget_words,
+)
 from backend.product_aggregator import search_products, get_reviews
 from backend.data_processor import process_products, products_to_dict_list
 from backend.recommendation_engine import recommend, get_match_label
@@ -19,6 +26,65 @@ load_dotenv()
 
 app = Flask(__name__, static_folder="../frontend")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+
+def _enrich_products_with_reviews(products: list) -> list:
+    """Attach real review snippets to every result without serial network waits."""
+    def fetch_one(item):
+        index, product = item
+        asin = product.get("asin")
+        try:
+            reviews = get_reviews(asin=asin, product_url=product.get("product_url")) if asin else []
+        except Exception as exc:
+            print(f"[Review Scraper] Failed for {asin}: {exc}")
+            reviews = []
+        return index, product, reviews
+
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(products)))) as pool:
+        fetched = list(pool.map(fetch_one, enumerate(products)))
+
+    enriched = []
+    for index, product, reviews in fetched:
+        product["reviews"] = reviews
+        # Show source review snippets directly. Per-product LLM calls made the
+        # results page wait on several sequential remote requests and could
+        # introduce unsupported generic claims when the model timed out.
+        product.setdefault("pros", [])
+        product.setdefault("cons", [])
+        product["sentiment"] = "available_for_review" if reviews else "unavailable"
+        enriched.append(product)
+    return enriched
+
+
+def _classify_refinement_context(user_query: str, original_req: dict, new_req: dict) -> str:
+    """Decide whether a chat turn keeps the current search or starts a new one."""
+    current = str(user_query or "").lower()
+    previous = str(original_req.get("search_query") or "").lower()
+    old_models = set(original_req.get("required_models") or [])
+    new_models = set(new_req.get("required_models") or [])
+    old_category = str(original_req.get("category") or "").lower()
+    new_category = infer_category_from_text(user_query) or str(new_req.get("category") or "").lower()
+
+    if re.search(r"\b(?:instead|switch(?:\s+to)?|start over|new search|new laptop|different\s+(?:product|laptop|macbook|phone|headphones|tablet|tv))\b", current):
+        return "new_search"
+    if new_category and old_category and new_category != old_category:
+        return "new_search"
+    if new_models and new_models != old_models:
+        return "new_search"
+
+    named_products = ("apple", "macbook", "samsung", "galaxy", "oneplus", "pixel", "redmi", "poco", "lenovo", "asus", "dell", "hp", "acer", "msi", "sony", "boat", "jbl")
+    if any(re.search(rf"\b{re.escape(name)}\b", current) and not re.search(rf"\b{re.escape(name)}\b", previous) for name in named_products):
+        return "new_search"
+
+    explicit_product_type = bool(re.search(
+        r"\b(?:laptops?|notebooks?|macbooks?|chromebooks?|phones?|smartphones?|mobiles?|headphones?|earphones?|earbuds?|tablets?|ipads?|monitors?|tvs?|televisions?|printers?|routers?|keyboards?|mice|mouses?|speakers?|cameras?|smartwatches?)\b",
+        current,
+    ))
+    # A broad category request clears a previous exact model. Budget-only
+    # requests contain no product type and therefore stay in the same context.
+    if explicit_product_type and old_models and not new_models:
+        return "new_search"
+    return "refinement"
 
 # Initialize database on startup
 try:
@@ -64,53 +130,19 @@ def recommend_products():
             "search_query": user_query, "keywords": [],
             "priority_specs": {}
         }
-    ALLOWED_CATEGORIES = [
-        "laptop", "mobile", "smartphone", "headphones",
-        "earbuds", "tablet", "monitor", "keyboard",
-        "mouse", "speaker", "smartwatch", "camera"
-    ]
-
     print("[DEBUG] Requirements:", requirements)
 
-    raw_category = (requirements.get("category") or "").lower()
-    query_lower = user_query.lower()
-
-    if "laptop" in raw_category or "laptop" in query_lower:
-        category = "laptop"
-    elif (
-        "phone" in raw_category
-        or "mobile" in raw_category
-        or "phone" in query_lower
-        or "iphone" in query_lower
-        or "samsung" in query_lower
-        or "oneplus" in query_lower
-        or "pixel" in query_lower
-    ):
+    # Explicit product words in the user's query take precedence over an AI
+    # classification that may be incomplete or temporarily unavailable.
+    category = infer_category_from_text(user_query) or str(
+        requirements.get("category") or ""
+    ).lower()
+    if category in {"smartphone", "phones", "phone"}:
         category = "mobile"
-    elif "headphone" in raw_category or "earbud" in raw_category or "headphone" in query_lower:
-        category = "headphones"
-    elif "tablet" in raw_category or "tablet" in query_lower:
-        category = "tablet"
-    elif "monitor" in raw_category or "monitor" in query_lower:
-        category = "monitor"
-    elif "keyboard" in raw_category or "keyboard" in query_lower:
-        category = "keyboard"
-    elif "mouse" in raw_category or "mouse" in query_lower:
-        category = "mouse"
-    elif "speaker" in raw_category or "speaker" in query_lower:
-        category = "speaker"
-    elif "watch" in raw_category or "watch" in query_lower:
-        category = "smartwatch"
-    elif "camera" in raw_category or "camera" in query_lower:
-        category = "camera"
-    else:
-        category = ""
-
-    print("[DEBUG] Raw:", raw_category, "| Final:", category)
 
     if not category:
         return jsonify({
-            "error": "Only electronic products are supported right now.",
+            "error": "What kind of product do you need? Try a laptop, phone, headphones, or TV.",
             "examples": [
                 "laptop under 60000",
                 "best headphones for gym",
@@ -122,30 +154,29 @@ def recommend_products():
     requirements["category"] = category
 
     # Step 2: Fetch products from Amazon API
-    search_query = f"{category} {user_query}".strip()
-    budget_max = requirements.get("budget_max")
+    search_query = str(requirements.get("search_query") or user_query).strip()
+    gpu_model_search = bool(re.search(r"\b(?:rtx|gtx|geforce|radeon|rx)\s*\d{3,4}\b", user_query, re.I))
+    explicit_laptop = bool(re.search(r"\b(?:laptop|notebook|macbook|chromebook)\b", user_query, re.I))
+    explicit_graphics_card = bool(re.search(r"\b(?:graphics? card|video card)\b", user_query, re.I))
+    if gpu_model_search and category == "laptop" and not explicit_laptop and not explicit_graphics_card:
+        # A bare GPU model query is treated as a laptop request, so say
+        # "laptop" explicitly to Amazon and avoid desktop graphics cards.
+        search_query = f"laptop {search_query}".strip()
+    elif not infer_category_from_text(user_query):
+        search_query = f"{category} {search_query}".strip()
 
     try:
-        if budget_max is not None:
-
-            raw_products = search_products(
-                query=search_query,
-                category=requirements.get("category", "laptop"),
-                budget_max=budget_max,
-                page=1
-            )
-
-        else:
-
-            raw_products = search_products(
-                query=search_query,
-                category=requirements.get("category", "laptop"),
-                page=1
-            )
+        raw_products = search_products(
+            query=search_query,
+            category=category,
+            budget_min=requirements.get("budget_min"),
+            budget_max=requirements.get("budget_max"),
+            page=1,
+        )
         print(f"[Amazon] Fetched {len(raw_products)} products")
     except Exception as e:
         print(f"[Amazon] Error: {e}")
-        return jsonify({"error": "Failed to fetch products from Amazon. Check your RapidAPI key."}), 502
+        return jsonify({"error": "Amazon product retrieval failed. Check network access or whether Amazon is blocking the current request."}), 502
 
     if not raw_products:
         return jsonify({"error": "No products found. Try adjusting your query or budget."}), 404
@@ -158,37 +189,18 @@ def recommend_products():
     # Step 4: Run ML recommendation engine
     ranked_df = recommend(df, requirements, top_n=6)
 
-    # Step 5: Enrich top products with reviews + sentiment
+    # Step 5: Add review snippets for all visible results.
     products_list = products_to_dict_list(ranked_df)
-    for product in products_list[:3]:  # Enrich top 3 to save API calls
-        asin = product.get("asin")
-        if asin:
-            try:
-                reviews = get_reviews(product_url=product["product_url"])
-                sentiment_data = analyze_product_sentiment(reviews)
-                product["pros"] = sentiment_data.get("pros", [])
-                product["cons"] = sentiment_data.get("cons", [])
-                product["sentiment"] = sentiment_data.get("sentiment", "mixed")
-                product["reviews"] = reviews[:3]  # Store top 3 reviews
-            except Exception as e:
-                print(f"[Sentiment] Error for {asin}: {e}")
-                product["pros"] = ["Good value for money", "Solid performance"]
-                product["cons"] = ["Limited accessories included"]
-                product["sentiment"] = "mixed"
-        else:
-            product["pros"] = []
-            product["cons"] = []
-            product["sentiment"] = "mixed"
+    for product in products_list:
+        exact_match = bool(requirements.get("required_models"))
+        product["match_label"] = get_match_label(product.get("match_score", 0), exact_match=exact_match)
+        if exact_match:
+            product["pros"] = [f"Matches the {requirements['required_models'][0].upper()} model you asked for."]
+    products_list = _enrich_products_with_reviews(products_list)
 
-        # Add match label
-        product["match_label"] = get_match_label(product.get("match_score", 0))
 
-    # Step 6: Generate AI summary
-    try:
-        summary = generate_recommendation_summary(products_list, user_query)
-    except Exception as e:
-        print(f"[Claude] Summary error: {e}")
-        summary = f"Found {len(products_list)} products matching your requirements."
+    # Step 6: Give a fast, factual summary based on the ranked results.
+    summary = generate_recommendation_summary(products_list, user_query)
 
     # Step 7: Save to database
     try:
@@ -221,52 +233,56 @@ def refine_search():
     original_req = data.get("original_requirements", {})
     session_id = data.get("session_id", str(uuid.uuid4()))
 
-    #STEP 1: Merge AI parsed requirements
     try:
         new_req = parse_user_requirements(user_query)
-        merged = {**original_req}
+    except Exception as exc:
+        print("[Refine parse error]:", exc)
+        new_req = {
+            "category": infer_category_from_text(user_query),
+            "search_query": _remove_budget_words(user_query),
+            "budget_min": None, "budget_max": None, "required_models": [],
+            "priority_specs": {}, "use_case": "general", "intent": "none", "modifiers": [],
+        }
 
-        for key, val in new_req.items():
+    previous_query = str(original_req.get("search_query", ""))
+    context_mode = _classify_refinement_context(user_query, original_req, new_req)
+    replace_context = context_mode == "new_search"
+    category_from_text = infer_category_from_text(user_query) or new_req.get("category")
 
-            if key == "category" and not val:
-                continue
-
-            if val is not None and val != {} and val != []:
+    #STEP 1: Merge AI parsed requirements
+    merged = {} if replace_context else {**original_req}
+    for key, val in new_req.items():
+        if key == "priority_specs" and isinstance(val, dict):
+            if replace_context:
                 merged[key] = val
-
-    except Exception as e:
-        print("[Claude refine error]:", e)
-        merged = {**original_req}
-        merged["search_query"] = user_query
-        new_req = {}
+            else:
+                old_specs = merged.get("priority_specs") or {}
+                meaningful = {k: v for k, v in val.items() if v not in (None, False, [], "")}
+                if meaningful:
+                    merged[key] = {**old_specs, **meaningful}
+            continue
+        if key == "required_models":
+            if replace_context or val:
+                merged[key] = val
+            continue
+        if key == "use_case" and val == "general" and original_req.get("use_case") and not replace_context:
+            continue
+        if val is not None and val != {} and val != []:
+            merged[key] = val
 
     query_lower = user_query.lower()
 
-    #STEP 2: CATEGORY
-    if "laptop" in query_lower:
-        merged["category"] = "laptop"
-    elif "phone" in query_lower or "mobile" in query_lower:
-        merged["category"] = "mobile"
-    elif "headphone" in query_lower or "earbud" in query_lower:
-        merged["category"] = "headphones"
-    elif "tablet" in query_lower:
-        merged["category"] = "tablet"
-    elif "monitor" in query_lower:
-        merged["category"] = "monitor"
-    elif "keyboard" in query_lower:
-        merged["category"] = "keyboard"
-    elif "mouse" in query_lower:
-        merged["category"] = "mouse"
-    elif "speaker" in query_lower:
-        merged["category"] = "speaker"
-    elif "watch" in query_lower:
-        merged["category"] = "smartwatch"
-    elif "camera" in query_lower:
-        merged["category"] = "camera"
+    # STEP 2: preserve the selected category unless the refinement names a new one.
+    if category_from_text:
+        merged["category"] = category_from_text
 
 
     if not merged.get("category"):
         merged["category"] = original_req.get("category", "laptop")
+
+    explicit_budget = parse_budget_limits(user_query)
+    if explicit_budget["budget_min"] is not None or explicit_budget["budget_max"] is not None:
+        merged.update(explicit_budget)
 
     #STEP 3: AI INTENT HANDLING
 
@@ -314,9 +330,7 @@ def refine_search():
 
     category = merged.get("category", "laptop")
 
-    previous_query = str(
-        original_req.get("search_query", "")
-    ).strip()
+    previous_query = previous_query.strip()
 
     current_query = str(user_query).strip()
 
@@ -352,104 +366,10 @@ def refine_search():
             flags=re.IGNORECASE
         ).strip()
 
-    # Detect category/brand replacement
-
-
-    replacement_keywords = [
-        "instead",
-        "change",
-        "switch",
-        "different"
-    ]
-
-    brands = [
-        "iphone",
-        "apple",
-        "samsung",
-        "oneplus",
-        "pixel",
-        "lenovo",
-        "asus",
-        "dell",
-        "hp",
-        "acer",
-        "msi",
-        "sony",
-        "boat",
-        "jbl"
-    ]
-
-    new_brand_detected = any(
-        brand in query_lower
-        for brand in brands
-    )
-
-    replacement_detected = any(
-        word in query_lower
-        for word in replacement_keywords
-    )
-
-# Decide refinement mode
-
-# Detect NEW SEARCH vs REFINE
-
-
-    categories = [
-        "laptop",
-        "mobile",
-        "phone",
-        "iphone",
-        "smartphone",
-        "headphones",
-        "earbuds",
-        "tablet",
-        "monitor",
-        "keyboard",
-        "mouse",
-        "speaker",
-        "camera",
-        "watch"
-    ]
-
-    refine_words = [
-        "better",
-        "cheaper",
-        "lighter",
-        "battery",
-        "performance",
-        "gaming",
-        "portable",
-        "under",
-        "above",
-        "less",
-        "more",
-        "faster"
-    ]
-
-    # detect if user is asking a fresh product search
-    new_category_detected = any(
-        word in query_lower
-        for word in categories
-    )
-
-    # detect refine-type query
-    is_refinement = any(
-        word in query_lower
-        for word in refine_words
-    )
-
-
-    # FINAL DECISION
-
-
-    if replacement_detected:
+    # Select a new search context or continue the existing search.
+    if replace_context:
         
         # explicit replace
-        combined_query = current_query
-
-    elif new_category_detected and not is_refinement:
-
-        # completely new search
         combined_query = current_query
 
     else:
@@ -477,26 +397,21 @@ def refine_search():
     print("[REFINED QUERY]", search_query)
 
     # STEP 6: FETCH PRODUCTS 
+    store_query = _remove_budget_words(search_query)
+    if (
+        category == "laptop"
+        and re.search(r"\b(?:rtx|gtx|geforce|radeon|rx)\s*\d{3,4}\b", store_query, re.I)
+        and not re.search(r"\b(?:laptop|notebook|macbook|chromebook|graphics? card|video card)\b", store_query, re.I)
+    ):
+        store_query = f"laptop {store_query}"
+
     raw_products = search_products(
-        query=search_query,
+        query=store_query,
         category=category,
+        budget_min=merged.get("budget_min"),
         budget_max=merged.get("budget_max"),
-        page=1
+        page=1,
     )
-
-    # Fallback search if no results
-
-    if not raw_products:
-
-        fallback_query = category
-
-        print("[REFINE FALLBACK]", fallback_query)
-
-        raw_products = search_products(
-            query=fallback_query,
-            category=category,
-            page=1
-        )
 
     # STEP 7: PROCESS + RANK
     df = process_products(raw_products, merged)
@@ -504,19 +419,22 @@ def refine_search():
     products_list = products_to_dict_list(ranked_df)
 
     # STEP 8: LABELS
-    for product in products_list[:3]:
-        product["match_label"] = get_match_label(product.get("match_score", 0))
-        product["pros"] = []
-        product["cons"] = []
+    for product in products_list:
+        exact_match = bool(merged.get("required_models"))
+        product["match_label"] = get_match_label(product.get("match_score", 0), exact_match=exact_match)
+        if exact_match:
+            product["pros"] = [f"Matches the {merged['required_models'][0].upper()} model you asked for."]
+    products_list = _enrich_products_with_reviews(products_list)
 
     # ─── STEP 9: SUMMARY ───
     try:
-        summary = generate_recommendation_summary(products_list, user_query)
+        summary = generate_recommendation_summary(products_list, merged.get("search_query", user_query))
     except Exception:
         summary = f"Refined results: {len(products_list)} products found."
 
     return jsonify({
         "success": True,
+        "context_mode": context_mode,
         "session_id": session_id,
         "requirements": merged,
         "summary": summary,
@@ -554,4 +472,4 @@ def health():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5001))
     debug = os.getenv("FLASK_ENV", "production") == "development"
-    app.run(host="0.0.0.0", port=5001, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=debug)
