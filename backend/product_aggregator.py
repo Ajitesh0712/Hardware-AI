@@ -9,13 +9,15 @@ def search_products(
     category=None,
     budget_min=None,
     budget_max=None,
-    page=1
+    page=1,
+    exact_models=True,
 ):
     return search_amazon(
         query=query,
         page=page,
         budget_min=budget_min,
         budget_max=budget_max,
+        exact_models=exact_models,
     )
 
 def get_reviews(asin=None, product_url=None):

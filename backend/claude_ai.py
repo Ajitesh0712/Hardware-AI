@@ -4,6 +4,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from collections import Counter
 import re
+from backend.use_cases import detect_use_cases
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -186,6 +187,7 @@ def parse_user_requirements(user_query: str) -> dict:
             **lexical_budget,
             "category": lexical_category,
             "use_case": local_use_case,
+            "use_cases": detect_use_cases(user_query),
             "brand_preference": None,
             "keywords": [],
             "intent": "none",
@@ -281,6 +283,7 @@ Query: {user_query}
         parsed["use_case"] = local_use_case if local_use_case != "general" else parsed.get("use_case", "general")
         parsed["priority_specs"] = {**parsed.get("priority_specs", {}), **local_specs}
         parsed["required_models"] = local_specs["hardware_models"]
+        parsed["use_cases"] = detect_use_cases(user_query)
         parsed["search_query"] = _remove_budget_words(user_query)
 
         return parsed
@@ -297,6 +300,7 @@ Query: {user_query}
             **lexical_budget,
             "category": lexical_category,
             "use_case": local_use_case,
+            "use_cases": detect_use_cases(user_query),
             "brand_preference": None,
             "keywords": [],
             "intent": "none",
@@ -329,12 +333,13 @@ def generate_recommendation_summary(products: list, user_query: str) -> str:
             model_phrase = f" with {model} graphics"
         else:
             model_phrase = f" with {model}"
-    use_case = _infer_use_case(user_query)
-    use_case_phrase = {
-        "gaming": " for gaming", "coding": " for coding", "design": " for design",
-        "video editing": " for video editing", "3d rendering": " for 3D work",
-        "student": " for school or college", "business": " for work",
-    }.get(use_case, "")
+    use_case_names = {
+        "gaming": "gaming", "coding": "coding", "design": "design",
+        "video editing": "video editing", "3d modelling": "3D work",
+        "student": "school or college", "business": "work",
+    }
+    uses = [use_case_names[name] for name in detect_use_cases(user_query) if name in use_case_names]
+    use_case_phrase = (" for " + " and ".join(uses)) if uses else ""
     budgets = parse_budget_limits(user_query)
     budget_phrase = ""
     if budgets.get("budget_min") is not None and budgets.get("budget_max") is not None:

@@ -1,7 +1,21 @@
 import requests
 from bs4 import BeautifulSoup
 import re
+import time
 from urllib.parse import urlparse
+
+# ---------------------------------------------------------------------------
+# Being a polite client
+# ---------------------------------------------------------------------------
+# Amazon blocks clients that send many requests quickly. To send fewer:
+#   * the same search is answered from memory for CACHE_SECONDS,
+#   * after a robot-check page we stop asking Amazon for PAUSE_SECONDS,
+#   * review pages are skipped for PAUSE_SECONDS once they stop working.
+CACHE_SECONDS = 15 * 60
+PAUSE_SECONDS = 10 * 60
+_search_cache = {}          # (query, page, budget_min, budget_max) -> (saved_at, products)
+_paused_until = 0.0         # time.time() value; 0 means "not paused"
+_reviews_paused_until = 0.0
 
 
 HEADERS = {
@@ -34,14 +48,44 @@ def _looks_blocked(html):
     return len(html) < 20000 and 's-search-result' not in text
 
 
-def search_amazon(query, page=1, budget_min=None, budget_max=None):
+def minutes_until_retry():
+    """Whole minutes left in the pause after a block (0 = not paused)."""
+    return max(0, int((_paused_until - time.time() + 59) // 60))
+
+
+def _pause_after_block():
+    global _paused_until, _reviews_paused_until
+    _paused_until = time.time() + PAUSE_SECONDS
+    _reviews_paused_until = _paused_until
+
+
+def search_amazon(query, page=1, budget_min=None, budget_max=None, exact_models=True):
+    """Return search results, using the short-term cache when possible.
+
+    exact_models=False is used when the app itself added a model name to the
+    search (e.g. "rtx 4060" as a hint for 3D work); then other GPUs are kept.
+    """
+    key = (str(query or "").lower().strip(), int(page), budget_min, budget_max, exact_models)
+    saved = _search_cache.get(key)
+    if saved and time.time() - saved[0] < CACHE_SECONDS:
+        return [dict(product) for product in saved[1]]
+    if minutes_until_retry():
+        raise AmazonBlockedError(
+            f"Amazon blocked recent requests; waiting {minutes_until_retry()} more minute(s) before trying again"
+        )
+    products = _search_amazon_live(query, page, budget_min, budget_max, exact_models)
+    _search_cache[key] = (time.time(), [dict(product) for product in products])
+    return products
+
+
+def _search_amazon_live(query, page=1, budget_min=None, budget_max=None, exact_models=True):
     """Search Amazon India and enforce any explicit price bounds locally.
 
     If the first results page cannot be fetched (network error, HTTP error or
     a robot-check page) an exception is raised, so the API can say that the
     store could not be reached instead of saying that no products exist.
     """
-    models = _extract_search_models(query)
+    models = _extract_search_models(query) if exact_models else []
     pages_to_check = range(int(page), int(page) + (3 if models else 1))
     if budget_min is not None:
         low_price = str(int(float(budget_min)))
@@ -64,6 +108,7 @@ def search_amazon(query, page=1, budget_min=None, budget_max=None):
             response = requests.get("https://www.amazon.in/s", params=params, headers=HEADERS, timeout=10)
             response.raise_for_status()
             if _looks_blocked(response.text):
+                _pause_after_block()
                 raise AmazonBlockedError("Amazon returned a robot-check page instead of search results")
         except Exception as e:
             print(f"[Amazon Scraper] Error on page {search_page}: {e}")
@@ -95,6 +140,7 @@ def search_amazon(query, page=1, budget_min=None, budget_max=None):
         # the first results page. Six candidates are enough for ranking.
         if len(products) >= 6 or not models:
             break
+        time.sleep(1)  # small gap before asking for the next results page
 
     return products
 
@@ -286,12 +332,19 @@ def get_product_reviews(asin=None, product_url=None):
         match = re.search(r"/dp/([A-Z0-9]{10})|/product-reviews/([A-Z0-9]{10})", product_url, re.I)
         if match:
             asin = match.group(1) or match.group(2)
-    if not asin:
+    global _reviews_paused_until
+    if not asin or time.time() < _reviews_paused_until:
         return []
     review_url = f"https://www.amazon.in/product-reviews/{asin}/?reviewerType=all_reviews&sortBy=recent&pageNumber=1"
     try:
         response = requests.get(review_url, headers=HEADERS, timeout=5)
         response.raise_for_status()
+        # Review pages may need a sign-in or show a robot check. Either way
+        # they will not work for a while, so stop requesting them.
+        if _looks_blocked(response.text) or "/ap/signin" in response.url:
+            _reviews_paused_until = time.time() + PAUSE_SECONDS
+            print("[Review Scraper] Review pages unavailable (sign-in or robot check); pausing review requests")
+            return []
         soup = BeautifulSoup(response.text, "lxml")
         reviews = []
         for block in soup.select('[data-hook="review"]'):

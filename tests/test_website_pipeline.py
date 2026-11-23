@@ -55,6 +55,12 @@ CATALOGUE = [
     make_product("MACM4A", 'Apple MacBook Air 13" Laptop with M4 chip, 16GB Unified Memory, 256GB SSD', 99900),
     make_product("LAPBUD1", 'Lenovo IdeaPad Slim 3 Intel Core i5 12th Gen, 16GB RAM, 512GB SSD, 15.6" FHD Laptop', 48990),
     make_product("LAPBUD2", "HP 15s AMD Ryzen 5 5500U, 8GB DDR4 RAM, 512GB SSD, Windows 11, 15.6 inch Laptop", 38990, rating=None, num_ratings=None),
+    make_product("PS5A", "Sony PlayStation®5 Console (Slim) Digital Edition", 44990),
+    make_product("PS5C", "Sony DualSense Wireless Controller for PlayStation 5 - White", 5990),
+    make_product("XBX1", "Xbox Series X 1TB Console", 54990),
+    make_product("XBG1", "Forza Horizon 5 Standard Edition (Xbox Series X|S Game)", 2999),
+    make_product("FOLD1", "Samsung Galaxy Z Fold7 5G (Blue Shadow, 12GB RAM, 256GB Storage)", 174999),
+    make_product("RTX5090L", "ASUS ROG Strix SCAR 18, Intel Core Ultra 9 275HX, RTX 5090 24GB, 64GB RAM, 2TB SSD, Gaming Laptop", 449990),
     make_product("BAG1", "Laptop Backpack for 15.6 inch Laptops, Water Resistant", 999),
     make_product("STAND1", "Adjustable Laptop Stand for Desk, Aluminium", 799),
 ]
@@ -68,7 +74,7 @@ class FakeStore:
         self.products = CATALOGUE if products is None else products
         self.queries = []
 
-    def search(self, query, category=None, budget_min=None, budget_max=None, page=1):
+    def search(self, query, category=None, budget_min=None, budget_max=None, page=1, exact_models=True):
         self.queries.append(query)
         results = []
         for product in self.products:
@@ -217,6 +223,89 @@ class WebsitePipelineTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["products"], [])
 
+    # ---- any electronics, not only fixed groups ------------------------
+    def test_product_outside_fixed_groups_is_searched_as_electronics(self):
+        status, data = self.recommend("samsung fold")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["requirements"]["category"], "electronics")
+        self.assertEqual(self.asins(data), ["FOLD1"])
+
+    def test_console_ranks_above_its_accessories(self):
+        status, data = self.recommend("i need sony playstation 5")
+        self.assertEqual(status, 200)
+        self.assertEqual(self.asins(data)[0], "PS5A")
+        self.assertNotIn("LAP4060A", self.asins(data))
+        self.assertEqual(self.store.queries[-1], "sony playstation 5")  # filler words removed
+
+    def test_new_product_after_model_search_starts_new_search(self):
+        _, first = self.recommend("rtx 5090")
+        status, data = self.refine("ps5", first["requirements"])
+        self.assertEqual(status, 200)
+        self.assertEqual(data["context_mode"], "new_search")
+        self.assertEqual(data["requirements"]["required_models"], [])
+        self.assertEqual(self.asins(data)[0], "PS5A")
+        self.assertNotIn("RTX5090L", self.asins(data))
+
+    def test_accessory_follow_up_searches_for_previous_product(self):
+        _, first = self.recommend("i need sony playstation 5")
+        status, data = self.refine("controller", first["requirements"])
+        self.assertEqual(status, 200)
+        self.assertEqual(data["context_mode"], "accessory")
+        self.assertEqual(self.store.queries[-1], "sony ps5 controller")
+        self.assertEqual(self.asins(data)[0], "PS5C")
+
+    def test_spec_word_follow_up_still_refines(self):
+        _, first = self.recommend("laptop under 50000")
+        status, data = self.refine("with i5", first["requirements"])
+        self.assertEqual(data["context_mode"], "refinement")
+        self.assertEqual(data["requirements"]["budget_max"], 50000)
+
+    # ---- match score out of 10 ------------------------------------------
+    def test_match_label_is_score_out_of_10(self):
+        _, first = self.recommend("i need sony playstation 5")
+        _, data = self.refine("playstation 5 controller", first["requirements"])
+        labels = {p["asin"]: p["match_label"] for p in data["products"]}
+        self.assertEqual(labels["PS5C"], "10/10 match")
+        self.assertLessEqual(int(labels["PS5A"].split("/")[0]), 4)
+        for product in data["products"]:
+            self.assertTrue(1 <= product["fit_score"] <= 10)
+            self.assertEqual(product["match_score"], product["fit_score"] * 10)
+
+    def test_missing_wish_lowers_score(self):
+        _, data = self.recommend("gaming laptop under 50000")
+        scores = [p["fit_score"] for p in data["products"]]
+        self.assertTrue(scores)
+        self.assertTrue(all(score < 10 for score in scores))  # neither cheap laptop says "gaming"
+
+    # ---- uses instead of specs ("for video editing and 3d") -------------
+    def test_use_case_request_searches_and_ranks_by_hardware(self):
+        status, data = self.recommend("i need a laptop which is suitable for smooth video editing and 3d modelling work")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["requirements"]["use_cases"], ["3d modelling", "video editing"])
+        self.assertEqual(self.store.queries[-1], "laptop rtx 4060 16gb ram")
+        top_three = self.asins(data)[:3]
+        self.assertTrue(set(top_three) <= {"LAP4060A", "LAP4060B", "RTX5090L", "MACM5PRO"})
+        self.assertNotIn("LAPBUD2", self.asins(data))  # Ryzen 5 U, 8GB, no GPU
+        self.assertIn("video editing", data["summary"])
+
+    def test_laptop_without_gpu_is_capped_for_video_editing(self):
+        _, first = self.recommend("laptop under 100000")
+        status, data = self.refine("for video editing", first["requirements"])
+        self.assertEqual(data["context_mode"], "refinement")
+        self.assertEqual(data["requirements"]["budget_max"], 100000)
+        scores = {p["asin"]: p["fit_score"] for p in data["products"]}
+        self.assertLessEqual(scores["LAPBUD1"], 5)       # integrated graphics
+        self.assertEqual(scores["LAP4060B"], 10)         # RTX 4060 + Ryzen 7 HS + 16GB
+        self.assertEqual(self.asins(data)[-1], "LAPBUD1")
+
+    def test_hardware_levels_from_titles(self):
+        from backend.use_cases import cpu_level, gpu_level
+        self.assertGreater(gpu_level("RTX 4060 8GB"), gpu_level("RTX 3050 4GB"))
+        self.assertGreater(gpu_level("RTX 3050 4GB"), gpu_level("RTX 2050"))
+        self.assertGreater(gpu_level("MacBook Pro with M5 Pro chip"), gpu_level("MacBook Air with M5 chip"))
+        self.assertGreater(cpu_level("Intel Core i7-13650HX"), cpu_level("Intel Core i5-1235U"))
+        self.assertLess(cpu_level("Intel Celeron N4500"), 0.2)
+
     # ---- ranking -------------------------------------------------------
     def test_exact_model_matches_rank_above_other_laptops(self):
         # Without a model filter the GPU laptops are all visible, but a
@@ -265,6 +354,15 @@ class WebsitePipelineTests(unittest.TestCase):
 
 class ScraperParsingTests(unittest.TestCase):
     """Checks the HTML parser on a tiny hand-written search result."""
+
+    def setUp(self):
+        from backend.scrapers import amazon_scraper
+        # The cache and the pause after a block are shared state; start clean.
+        amazon_scraper._search_cache.clear()
+        amazon_scraper._paused_until = 0.0
+        amazon_scraper._reviews_paused_until = 0.0
+
+    tearDown = setUp
 
     def test_missing_rating_and_review_count_become_none(self):
         from bs4 import BeautifulSoup
@@ -316,10 +414,60 @@ class ScraperParsingTests(unittest.TestCase):
                 amazon_scraper.search_amazon("laptop")
 
         # Amazon can also send a tiny JavaScript challenge page with HTTP 200.
+        amazon_scraper._paused_until = 0.0
         FakeResponse.text = "<html><script>function triggerInterstitialChallenge() {}</script></html>"
         with mock.patch.object(amazon_scraper.requests, "get", return_value=FakeResponse()):
             with self.assertRaises(amazon_scraper.AmazonBlockedError):
                 amazon_scraper.search_amazon("laptop")
+
+    def test_after_a_block_amazon_is_not_asked_again_for_a_while(self):
+        from backend.scrapers import amazon_scraper
+
+        class BlockedResponse:
+            text = "<html>captcha</html>"
+            url = "https://www.amazon.in/s"
+
+            def raise_for_status(self):
+                return None
+
+        with mock.patch.object(amazon_scraper.requests, "get", return_value=BlockedResponse()) as fake_get:
+            with self.assertRaises(amazon_scraper.AmazonBlockedError):
+                amazon_scraper.search_amazon("laptop")
+            with self.assertRaises(amazon_scraper.AmazonBlockedError):
+                amazon_scraper.search_amazon("phone")
+            with self.assertRaises(amazon_scraper.AmazonBlockedError):
+                amazon_scraper.search_amazon("tv")
+        self.assertEqual(fake_get.call_count, 1)  # only the first search reached Amazon
+        self.assertGreaterEqual(amazon_scraper.minutes_until_retry(), 1)
+        self.assertEqual(amazon_scraper.get_product_reviews(asin="B0TEST0001"), [])  # reviews paused too
+
+    def test_repeated_search_is_answered_from_cache(self):
+        from backend.scrapers import amazon_scraper
+        product = {"asin": "A1", "product_title": "HP Laptop", "product_price": 40000.0}
+        with mock.patch.object(amazon_scraper, "_search_amazon_live", return_value=[product]) as live:
+            first = amazon_scraper.search_amazon("laptop")
+            second = amazon_scraper.search_amazon("Laptop ")
+        self.assertEqual(first, second)
+        self.assertEqual(live.call_count, 1)
+
+
+class PoliteClientAppTests(unittest.TestCase):
+    def test_block_gives_clear_wait_message(self):
+        from backend.scrapers import amazon_scraper
+        client = app_module.app.test_client()
+        with mock.patch.object(app_module, "search_products", side_effect=amazon_scraper.AmazonBlockedError("blocked")), \
+             mock.patch.object(app_module, "minutes_until_retry", return_value=7):
+            response = client.post("/api/recommend", json={"query": "laptop"})
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("wait about 7 minute", response.get_json()["error"])
+
+    def test_reviews_are_fetched_only_for_top_results(self):
+        products = [{"asin": f"A{i}", "product_url": ""} for i in range(6)]
+        with mock.patch.object(app_module, "get_reviews", return_value=["Good"]) as fake_reviews:
+            app_module._enrich_products_with_reviews(products)
+        self.assertEqual(fake_reviews.call_count, app_module.REVIEWS_FOR_TOP)
+        self.assertEqual(products[0]["sentiment"], "available_for_review")
+        self.assertEqual(products[5]["sentiment"], "unavailable")
 
 
 if __name__ == "__main__":

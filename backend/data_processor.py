@@ -182,6 +182,7 @@ def products_to_dict_list(df: pd.DataFrame) -> list:
                 "Graphics": _friendly_graphics_name(str(row.get("product_title", ""))),
             },
             "match_score": number_or(row.get("match_score")),
+            "fit_score": int(number_or(row.get("fit_score"), default=1)),
             "model_score": number_or(row.get("model_score")),
             "popularity_score": number_or(row.get("popularity_score")),
         })

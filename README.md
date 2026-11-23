@@ -60,3 +60,19 @@ python -m unittest discover -s tests -v
 
 Passing these tests does not show that live Amazon scraping works; Amazon may return a robot-check page, which the API now reports as a 502 error instead of "no products found".
 
+## Any electronics and the match score
+
+Requests outside the fixed groups (for example "ps5", "samsung fold", "xbox game") are searched as general electronics: results must name what the user typed, and add-ons such as cases, controllers or games rank lower unless they were asked for. In chat, a message that names a different product starts a new search, an accessory word ("controller", "case") searches for that accessory for the previous product, and words such as "gaming", "i5" or a budget refine the current search.
+
+Each result shows a match score out of 10 (`backend/recommendation_engine.py`, `fit_score_out_of_10`). It is the weighted share of the user's stated needs that the listing meets: product type, exact model, budget, RAM/storage, and other requested words found in the title. 10 means every stated need is met; 1 means none is. The score is based on the listing title, so a need the title does not mention cannot be confirmed.
+
+## Uses instead of specs
+
+A laptop request can describe what it is for instead of listing hardware, for example "laptop for smooth video editing and 3D modelling". `backend/use_cases.py` finds every use in the request (3D modelling, video editing, gaming, design, coding, student, business) and turns them into stated rules of thumb for GPU level, CPU level, RAM and storage, keeping the strictest need when several uses are named. These needs are used to
+
+- search Amazon for suitable hardware (e.g. "laptop rtx 4060 16gb ram"; such hint words never act as an exact-model filter),
+- add GPU/CPU/RAM/storage checks to the 1–10 match score, read from the listing title,
+- cap a laptop that clearly fails a key need (e.g. integrated graphics for 3D work) at 5/10.
+
+The levels are simple title-based rules of thumb, not benchmarks.
+
