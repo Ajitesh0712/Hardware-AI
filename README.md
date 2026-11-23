@@ -36,9 +36,9 @@ For deployment, the `Procfile` runs `gunicorn backend.app:app`; set the same env
 
 ## FCDS workflow and findings
 
-The analysis uses 5,010 product records and retains all rows through feature engineering. It includes data understanding, cleaning, univariate and bivariate EDA, non-parametric statistical analysis, rule-based category/spec extraction, regression model comparison, and a grouped holdout evaluation. The project report documents the dataset caveats, methods, results, and presentation procedure.
+The analysis uses 5,010 product records and retains all rows through feature engineering. Note that `review_rating` in the source file is the star value of one sampled review (always a whole number 1–5), not a product's average rating. It includes data understanding, cleaning, univariate and bivariate EDA, non-parametric statistical analysis, rule-based category/spec extraction, regression model comparison, and a grouped holdout evaluation. The project report documents the dataset caveats, methods, results, and presentation procedure.
 
-The learned regression target is a **proxy score** derived from rating, review-count popularity, and discount percentage. It is not a user satisfaction label, recommendation probability, or causal outcome. On the reserved 20% title-group holdout, the saved Random Forest achieved MAE 0.00494, RMSE 0.01142, and R² 0.9908. These strong values are expected in part because the predictors contain the same ingredients used to construct the proxy target; they demonstrate pipeline consistency, not real-world recommendation quality. Ranking also includes explicit use-case matching and is not simply the model prediction.
+The learned regression target is a **proxy score** derived from rating, review-count popularity, and discount percentage. It is not a user satisfaction label, recommendation probability, or causal outcome. On the reserved 20% holdout (995 rows, grouped by base product title so colour/storage variants of one product stay on the same side of the split), the saved Random Forest achieved MAE 0.00424, RMSE 0.00933, and R² 0.9932. These strong values are expected in part because the predictors contain the same ingredients used to construct the proxy target; they demonstrate pipeline consistency, not real-world recommendation quality. Ranking also includes explicit use-case matching and is not simply the model prediction.
 
 ## Model and live-data flow
 
@@ -48,4 +48,15 @@ The offline training/evaluation workflow is reproducible from the notebooks. The
 
 ## Rebuild the model
 
-Run notebooks 01–07 in order from the `Data Science/` directory. Phase 6 selects a model on grouped training/validation data and writes the model artifact; Phase 7 evaluates it once on the reserved grouped holdout. Do not use the holdout metrics to tune the model. Generated tables, plots, and the fitted artifact are stored under `Data Science/model_outputs/`, `Data Science/phase_outputs/`, and `backend/model_artifacts/`.
+Run notebooks 01–07 in order from the `Data Science/` directory (for example `jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.kernel_name=python3 01_data_understanding.ipynb`). Phase 6 selects a model on grouped training/validation data and writes the model artifact; Phase 7 evaluates it once on the reserved grouped holdout. Do not use the holdout metrics to tune the model. Generated tables, plots, and the fitted artifact are stored under `Data Science/model_outputs/`, `Data Science/phase_outputs/`, and `backend/model_artifacts/`.
+
+## Offline website checks
+
+`tests/test_website_pipeline.py` checks requirement parsing, chat follow-ups, category/model/budget filtering, ranking and error responses through Flask's test client. Amazon, review fetching and MySQL are replaced with fakes and Gemini is switched off, so the tests need no network or credentials:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Passing these tests does not show that live Amazon scraping works; Amazon may return a robot-check page, which the API now reports as a 502 error instead of "no products found".
+

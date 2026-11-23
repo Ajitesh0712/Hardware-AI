@@ -109,8 +109,8 @@ def recommend_products():
     Body: { "query": "...", "session_id": "..." }
     Returns: { "products": [...], "summary": "...", "requirements": {...} }
     """
-    data = request.get_json()
-    if not data or not data.get("query"):
+    data = request.get_json(silent=True)  # silent: a non-JSON body gives None, not an HTML 415 page
+    if not isinstance(data, dict) or not data.get("query"):
         return jsonify({"error": "Query is required"}), 400
 
     user_query = data["query"].strip()
@@ -225,12 +225,14 @@ def recommend_products():
 
 @app.route("/api/refine", methods=["POST"])
 def refine_search():
-    data = request.get_json()
-    if not data or not data.get("query"):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data.get("query"):
         return jsonify({"error": "Query required"}), 400
 
     user_query = data["query"]
-    original_req = data.get("original_requirements", {})
+    original_req = data.get("original_requirements")
+    if not isinstance(original_req, dict):
+        original_req = {}  # e.g. null when the page has no previous search
     session_id = data.get("session_id", str(uuid.uuid4()))
 
     try:
@@ -405,13 +407,17 @@ def refine_search():
     ):
         store_query = f"laptop {store_query}"
 
-    raw_products = search_products(
-        query=store_query,
-        category=category,
-        budget_min=merged.get("budget_min"),
-        budget_max=merged.get("budget_max"),
-        page=1,
-    )
+    try:
+        raw_products = search_products(
+            query=store_query,
+            category=category,
+            budget_min=merged.get("budget_min"),
+            budget_max=merged.get("budget_max"),
+            page=1,
+        )
+    except Exception as e:
+        print(f"[Amazon] Refine error: {e}")
+        return jsonify({"error": "Amazon product retrieval failed. Check network access or whether Amazon is blocking the current request."}), 502
 
     # STEP 7: PROCESS + RANK
     df = process_products(raw_products, merged)
@@ -448,13 +454,18 @@ def track_interaction():
     POST /api/interaction
     Body: { "session_id": "...", "asin": "...", "type": "click|purchase|compare" }
     """
-    data = request.get_json()
-    if data:
-        log_interaction(
-            session_id=data.get("session_id", ""),
-            asin=data.get("asin", ""),
-            interaction_type=data.get("type", "click")
-        )
+    data = request.get_json(silent=True)
+    if isinstance(data, dict):
+        try:
+            log_interaction(
+                session_id=data.get("session_id", ""),
+                asin=data.get("asin", ""),
+                interaction_type=data.get("type", "click")
+            )
+        except Exception as e:
+            # Logging is optional; the website must keep working without MySQL.
+            print(f"[DB] Interaction log skipped: {e}")
+            return jsonify({"success": False, "logged": False})
     return jsonify({"success": True})
 
 

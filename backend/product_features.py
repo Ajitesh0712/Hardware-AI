@@ -58,6 +58,11 @@ _ACCESSORIES = {
         r"\bkeyboard protector\b", r"\bkeyboard cover\b", r"\blaptop screen protector\b",
         r"\bcomputer mouse\b", r"\bwireless mouse\b", r"\bmouse\b", r"\bkeyboard\b",
         r"\bmonitor stand\b", r"\busb hub\b",
+        # Bags, tables and cleaning kits that mention "laptop" only as a fit.
+        r"\bbackpacks?\b", r"\bbriefcase\b", r"\bmessenger bag\b", r"\blaptops? bags?\b",
+        r"\blaptop (?:table|desk|tray|case|cover|skin)\b", r"\b(?:bed|study) table\b",
+        r"\bcleaning (?:kit|brush|tools)\b", r"\bcleaner kit\b", r"\bscreen cleaner\b",
+        r"\busb[ -]?c hub\b", r"\bcaddy\b",
     ],
     "Camera Accessories": [
         r"\btripod\b", r"\bmonopod\b", r"\bselfie stick\b",
@@ -95,6 +100,30 @@ _PHONE_PREFIX = re.compile(
     r"(?:lava\s+[a-z0-9]+)|(?:nokia\s+[a-z0-9]+))\b"
 )
 
+# A real laptop listing names the device and lists its hardware. Accessories
+# (bags, stands, mice, RAM sticks) usually mention "laptop" only as a
+# compatible device and do not list a processor plus memory/storage/OS.
+_LAPTOP_WORD = re.compile(r"\b(?:laptops?|macbook|chromebook|notebook pc|notebook computer)\b")
+_LAPTOP_PROCESSOR = re.compile(
+    r"\b(?:core\s*i[3579]|core\s+ultra|ultra\s*[3579]\s+\d{3}[a-z]{0,2}|core\s+[3579]\s+\d{3}[a-z]{0,2}|ryzen\s*[3579]|"
+    r"celeron|pentium|athlon|mediatek|"
+    r"snapdragon|apple\s+m\d|m\d\s+(?:pro\s+|max\s+)?chip|a\d{2}\s+(?:pro\s+)?chip)\b"
+)
+_LAPTOP_MEMORY_OR_OS = re.compile(
+    r"\b(?:\d{1,3}\s*gb\s*(?:ram|ddr\d|lpddr\d|unified memory)|\d{1,3}\s*gb\s*/\s*\d{2,4}\s*gb|"
+    r"\d{2,4}\s*gb\s*(?:pcie\s*|nvme\s*)?(?:ssd|emmc|hdd)|\d\s*tb\s*(?:pcie\s*|nvme\s*)?(?:ssd|hdd)|"
+    r"win(?:dows)?\s*1[01]|chrome\s*os|macos)\b"
+)
+
+
+def _is_laptop_device(text: str) -> bool:
+    return bool(
+        _LAPTOP_WORD.search(text)
+        and _LAPTOP_PROCESSOR.search(text)
+        and _LAPTOP_MEMORY_OR_OS.search(text)
+    )
+
+
 _SCREENS = {"Smartphones", "Laptops", "Tablets", "Smartwatches", "Televisions", "Monitors and Projectors"}
 _BATTERY_CATEGORIES = {"Smartphones", "Tablets", "Smartwatches", "Headphones and Earphones", "Speakers", "Power Banks", "Networking Devices", "Cameras", "Batteries"}
 
@@ -105,17 +134,23 @@ def classify_product(title: Any) -> str:
     if any(re.search(p, text) for p in _NON_ELECTRONIC):
         return "Non-electronic / Miscellaneous"
 
+    # Check laptops first: their titles often mention a keyboard, DDR RAM,
+    # a GPU, a battery or a charger, which would otherwise match the
+    # accessory and component rules below.
+    if _is_laptop_device(text):
+        return "Laptops"
+
     # Accessory identity is more specific than a compatible device brand.
     for category, patterns in _ACCESSORIES.items():
-        if category == "Computer Accessories" and re.search(r"\b(?:laptop|macbook|chromebook|notebook pc)\b", text):
-            # Product titles often list a laptop's keyboard or mouse support.
-            # Explicit bag/stand/sleeve patterns still matched above this guard.
-            narrowed = [p for p in patterns if p not in {r"\bkeyboard\b", r"\bcomputer mouse\b", r"\bwireless mouse\b", r"\bmouse\b"}]
-            if any(re.search(p, text) for p in narrowed):
-                return category
-            continue
         if any(re.search(p, text) for p in patterns):
             return category
+
+    # Short laptop titles ("Lenovo V15 G4 AMD Ryzen 5 7520U Laptop") may not
+    # list RAM or storage. Once accessories are ruled out, the laptop word
+    # plus a processor name is enough.
+    accessory_words = r"\b(?:case|cover|sleeve|skin|compatible|stand|bag)\b"
+    if _LAPTOP_WORD.search(text) and _LAPTOP_PROCESSOR.search(text) and not re.search(accessory_words, text):
+        return "Laptops"
 
     if _PHONE_PREFIX.search(text):
         return "Smartphones"
@@ -138,7 +173,8 @@ def classify_product(title: Any) -> str:
         ("Monitors and Projectors", r"\b(?:monitor|projector|computer display)\b"),
         ("Speakers", r"\b(?:speaker|soundbar|home theatre|home theater|subwoofer)\b"),
         ("Tablets", r"\b(?:tablet|ipad|galaxy tab|lenovo tab)\b"),
-        ("Laptops", r"\b(?:laptop|macbook|chromebook|notebook computer|notebook pc)\b"),
+        # No plain "laptop" rule here: titles such as "laptop backpack" or
+        # "laptop table" are not laptops. Real laptops are found above.
     ]
     for category, pattern in patterns:
         if re.search(pattern, text):
@@ -162,7 +198,8 @@ def extract_title_specs(title: Any, category: str | None = None) -> dict[str, fl
     # RAM and storage are only meaningful in device/component/storage titles.
     memory_categories = {"Smartphones", "Laptops", "Tablets", "Computer Components", "Storage Devices"}
     if category in memory_categories:
-        for ram in re.finditer(r"(\d{1,3})\s*gb\s*ram\b", text):
+        # Matches "8gb ram" and also "8gb ddr4 ram" / "16 gb lpddr5x ram".
+        for ram in re.finditer(r"(\d{1,3})\s*gb\s*(?:(?:lp)?ddr\d[a-z]?\s*)?ram\b", text):
             context = text[max(0, ram.start()-22):min(len(text), ram.end()+24)]
             if re.search(r"(?:up ?to|virtual|extendable)|ram plus", context):
                 continue

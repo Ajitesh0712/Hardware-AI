@@ -70,6 +70,9 @@ def process_products(raw_products: list, requirements: dict) -> pd.DataFrame:
         escaped = escaped.replace(r"\-", r"[ -]?")
         if re.fullmatch(r"m[1-5](?:\s+(?:pro|max|ultra))?", model):
             escaped += r"(?![a-z0-9])"
+        if re.fullmatch(r"m[1-5]", model):
+            # "M5" means the base chip, just as "RTX 4060" excludes the Ti.
+            escaped += r"(?!\s*(?:pro|max|ultra)\b)"
         if re.search(r"\b(?:rtx|gtx)\s*\d{3,4}$", model):
             escaped += r"(?!\s*(?:ti|super)\b)"
         elif re.search(r"\brx\s*\d{3,4}$", model):

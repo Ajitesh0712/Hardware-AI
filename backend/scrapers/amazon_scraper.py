@@ -14,8 +14,33 @@ HEADERS = {
 }
 
 
+class AmazonBlockedError(RuntimeError):
+    """Amazon answered with a robot check / CAPTCHA page instead of results."""
+
+
+def _looks_blocked(html):
+    """Spot Amazon's robot checks. They can come back with HTTP 200."""
+    text = html.lower()
+    markers = (
+        "captcha",
+        "enter the characters you see below",
+        "api-services-support@amazon.com",
+        "triggerinterstitialchallenge",  # small JavaScript challenge page
+    )
+    if any(marker in text for marker in markers):
+        return True
+    # A real search page is hundreds of KB. A tiny page with no result
+    # blocks is not a genuine "no products" answer.
+    return len(html) < 20000 and 's-search-result' not in text
+
+
 def search_amazon(query, page=1, budget_min=None, budget_max=None):
-    """Search Amazon India and enforce any explicit price bounds locally."""
+    """Search Amazon India and enforce any explicit price bounds locally.
+
+    If the first results page cannot be fetched (network error, HTTP error or
+    a robot-check page) an exception is raised, so the API can say that the
+    store could not be reached instead of saying that no products exist.
+    """
     models = _extract_search_models(query)
     pages_to_check = range(int(page), int(page) + (3 if models else 1))
     if budget_min is not None:
@@ -27,51 +52,51 @@ def search_amazon(query, page=1, budget_min=None, budget_max=None):
     else:
         high_price = None
 
-    try:
-        products = []
-        seen_asins = set()
-        for search_page in pages_to_check:
-            params = {"k": query, "page": str(search_page)}
-            if low_price is not None:
-                params["low-price"] = low_price
-            if high_price is not None:
-                params["high-price"] = high_price
+    products = []
+    seen_asins = set()
+    for search_page in pages_to_check:
+        params = {"k": query, "page": str(search_page)}
+        if low_price is not None:
+            params["low-price"] = low_price
+        if high_price is not None:
+            params["high-price"] = high_price
+        try:
             response = requests.get("https://www.amazon.in/s", params=params, headers=HEADERS, timeout=10)
             response.raise_for_status()
-            soup = BeautifulSoup(response.text, "lxml")
+            if _looks_blocked(response.text):
+                raise AmazonBlockedError("Amazon returned a robot-check page instead of search results")
+        except Exception as e:
+            print(f"[Amazon Scraper] Error on page {search_page}: {e}")
+            if search_page == pages_to_check[0]:
+                raise
+            break  # keep the products already found on earlier pages
 
-            results = soup.select('[data-component-type="s-search-result"]')
-            for item in results:
-                product = parse_product(item)
-                if not product:
-                    continue
-                title = product.get("product_title", "")
-                if models and not all(pattern.search(title) for pattern in models):
-                    continue
-                price = product.get("product_price")
-                if not price or (budget_min is not None and price < float(budget_min)) or (budget_max is not None and price > float(budget_max)):
-                    continue
-                asin = product.get("asin")
-                if asin and asin in seen_asins:
-                    continue
-                if asin:
-                    seen_asins.add(asin)
-                products.append(product)
+        soup = BeautifulSoup(response.text, "lxml")
 
-            # Search deeper only if the exact requested model was too rare on
-            # the first results page. Six candidates are enough for ranking.
-            if len(products) >= 6 or not models:
-                break
+        results = soup.select('[data-component-type="s-search-result"]')
+        for item in results:
+            product = parse_product(item)
+            if not product:
+                continue
+            title = product.get("product_title", "")
+            if models and not all(pattern.search(title) for pattern in models):
+                continue
+            price = product.get("product_price")
+            if not price or (budget_min is not None and price < float(budget_min)) or (budget_max is not None and price > float(budget_max)):
+                continue
+            asin = product.get("asin")
+            if asin and asin in seen_asins:
+                continue
+            if asin:
+                seen_asins.add(asin)
+            products.append(product)
 
-        return products
+        # Search deeper only if the exact requested model was too rare on
+        # the first results page. Six candidates are enough for ranking.
+        if len(products) >= 6 or not models:
+            break
 
-    except Exception as e:
-
-        print(
-            f"[Amazon Scraper] Error: {e}"
-        )
-
-        return []
+    return products
 
 
 def _extract_search_models(query):
@@ -95,6 +120,8 @@ def _extract_search_models(query):
             model = re.sub(r"^(?:geforce|radeon)\s+", "", match.group(0).lower())
             escaped = re.escape(model)
             escaped = re.sub(r"\\\s+", r"[\\s-]*", escaped).replace(r"\-", r"[ -]?")
+            if re.fullmatch(r"m[1-5]", model):
+                escaped += r"(?!\s*(?:pro|max|ultra)\b)"  # base chip only
             if re.search(r"\b(?:rtx|gtx)\s*\d{3,4}$", model):
                 escaped += r"(?!\s*(?:ti|super)\b)"
             elif re.search(r"\brx\s*\d{3,4}$", model):
@@ -103,11 +130,29 @@ def _extract_search_models(query):
     return matchers
 
 
+def _read_title(item):
+    """Return the full product title from one search-result card.
+
+    Amazon sometimes shows the brand in its own small <h2> ("Apple") above
+    the real title <h2> ("2026 MacBook Air 13 Laptop with M5 chip ...").
+    Reading only the first <h2> gave titles like "Apple", so exact-model
+    checks (M5, RTX 3060) failed for every product. We take the longest
+    heading and put the brand in front of it when it is missing.
+    """
+    headings = [h.get_text(" ", strip=True) for h in item.select("h2")]
+    headings = [text for text in headings if text]
+    if not headings:
+        return ""
+    title = max(headings, key=len)
+    brand = headings[0]
+    if brand != title and not title.lower().startswith(brand.lower()):
+        title = f"{brand} {title}"
+    return title
+
+
 def parse_product(item):
 
     try:
-
-        title_el = item.select_one("h2 span")
 
         link_el = item.select_one(
             "a.a-link-normal.s-no-outline"
@@ -122,17 +167,15 @@ def parse_product(item):
 
         review_el = item.select_one("a[href*='customerReviews']") or item.select_one("span.a-size-base.s-underline-text")
 
-        title = (
-            title_el.get_text(strip=True)
-            if title_el else ""
-        )
+        title = _read_title(item)
 
         price_str = (
             price_el.get_text(strip=True)
             if price_el else "0"
         )
 
-        rating = 0.0
+        # None means "not shown on the search page"; it is not a 0-star rating.
+        rating = None
         if rating_el:
 
             try:
@@ -144,7 +187,7 @@ def parse_product(item):
             except:
                 pass
 
-        review_count = _parse_review_count(review_el.get_text(" ", strip=True)) if review_el else 0
+        review_count = _parse_review_count(review_el.get_text(" ", strip=True)) if review_el else None
         if not review_count:
             for node in item.select("[aria-label]"):
                 label = node.get("aria-label", "")
@@ -152,6 +195,8 @@ def parse_product(item):
                     review_count = _parse_review_count(label)
                     if review_count:
                         break
+        if not review_count:
+            review_count = None  # count not shown, so do not report "0 ratings"
 
         image_url = (
             image_el.get("src", "")
