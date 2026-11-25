@@ -336,7 +336,7 @@ def generate_recommendation_summary(products: list, user_query: str) -> str:
     use_case_names = {
         "gaming": "gaming", "coding": "coding", "design": "design",
         "video editing": "video editing", "3d modelling": "3D work",
-        "student": "school or college", "business": "work",
+        "student": "school or college", "business": "work", "long battery": "long battery life",
     }
     uses = [use_case_names[name] for name in detect_use_cases(user_query) if name in use_case_names]
     use_case_phrase = (" for " + " and ".join(uses)) if uses else ""

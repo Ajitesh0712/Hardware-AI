@@ -20,8 +20,10 @@ USE_CASE_PATTERNS = [
     ("gaming", r"\b(?:gaming|gamer|games?|esports)\b"),
     ("design", r"\b(?:graphic design\w*|designing|designer|photoshop|illustrator|photo edit\w*|lightroom|design)\b"),
     ("coding", r"\b(?:coding|programming|programmer|developer|software development|data science|machine learning)\b"),
-    ("student", r"\b(?:student|school|college|university|online classes|studies)\b"),
+    ("student", r"\b(?:students?|study|studying|studies|school|college|university|online classes|notes)\b"),
     ("business", r"\b(?:business|office|work from home|excel|meetings?)\b"),
+    # "good battery", "long battery life", "don't want to keep charging it"
+    ("long battery", r"\b(?:battery|backup|all[ -]day|unplugged|(?:keep|keeps|constant(?:ly)?|always)\s+(?:it\s+)?charg\w*|charg\w*\s+(?:every|all the)\s*time)\b"),
 ]
 
 # Minimum RAM / storage (GB) and wanted GPU / CPU level for each use case.
@@ -33,6 +35,7 @@ LAPTOP_NEEDS = {
     "coding":        {"ram_gb": 16, "storage_gb": 512, "gpu": 0.0, "cpu": 0.6},
     "student":       {"ram_gb": 8,  "storage_gb": 256, "gpu": 0.0, "cpu": 0.3},
     "business":      {"ram_gb": 8,  "storage_gb": 256, "gpu": 0.0, "cpu": 0.3},
+    "long battery":  {"ram_gb": 8,  "storage_gb": 256, "gpu": 0.0, "cpu": 0.0, "battery": 0.7},
 }
 
 # Words that describe a use, so they are not expected in a product title.
@@ -44,7 +47,8 @@ USE_CASE_WORDS = {
     "illustrator", "photo", "lightroom", "coding", "programming", "programmer", "developer",
     "software", "development", "data", "science", "machine", "learning", "student", "students",
     "school", "college", "university", "online", "classes", "studies", "business", "office",
-    "work", "home", "excel", "meeting", "meetings",
+    "work", "home", "excel", "meeting", "meetings", "study", "studying", "notes",
+    "battery", "backup", "life", "day", "all", "unplugged", "charge", "charging", "charged",
 }
 
 
@@ -67,6 +71,8 @@ def laptop_search_hint(use_cases):
     """Words to add to the Amazon search so it returns suitable laptops."""
     needs = combined_needs(use_cases)
     words = []
+    if needs.get("battery", 0) > 0 and needs.get("gpu", 0) < 0.5:
+        words.append("long battery life")
     if needs.get("gpu", 0) >= 0.8:
         words.append("rtx 4060")     # a hint only: the app turns off exact-model filtering
     elif needs.get("gpu", 0) >= 0.5:
@@ -130,6 +136,40 @@ def cpu_level(title):
     return 0.5
 
 
+def battery_hours(title, specs=None):
+    """Battery hours from the spec table or title ("up to 12 hours"), else None.
+
+    These are the maker's figures, usually measured with light use.
+    """
+    value = None
+    for key, text in (specs or {}).items():
+        if key.strip().lower() == "battery life":
+            value = text
+    text = str(value or title or "").lower()
+    match = re.search(r"(\d{1,2}(?:\.\d)?)\s*(?:\+\s*)?(?:hrs?|hours)\b", text)
+    return float(match.group(1)) if match else None
+
+
+def battery_level(title, specs=None):
+    """0 (drains fast) to 1 (lasts all day) from listed hours or the chips used."""
+    hours = battery_hours(title, specs)
+    if hours:
+        for limit, level in ((12, 1.0), (9, 0.8), (7, 0.6), (5, 0.4)):
+            if hours >= limit:
+                return level
+        return 0.2
+    text = str(title or "").lower()
+    if re.search(r"\b(?:rtx|gtx)\s*-?\s*\d{3,4}|\bradeon\s+rx\b", text):
+        return 0.3   # gaming graphics cards use a lot of power
+    if re.search(r"\b(?:i[3579]-?\d{4,5}|ryzen\s*[3579]\s*\d{4}|ultra\s*[3579]\s*\d{3})h[xs]?\b", text):
+        return 0.4   # H / HX chips trade battery for speed
+    if re.search(r"\bmacbook\b|\bsnapdragon\b", text):
+        return 0.95  # very power-efficient ARM chips
+    if re.search(r"\b(?:i[3579]-?\d{4,5}|ryzen\s*[3579]\s*\d{4}|core\s*[3579]\s*\d{3}|ultra\s*[3579]\s*\d{3})u\b|\bchromebook\b|\blunar lake\b", text):
+        return 0.7   # U-series and Chromebooks are made for battery life
+    return 0.5
+
+
 def ram_from_title(title, extracted=None):
     """RAM in GB. Uses the shared extractor first, then '16GB/512GB' style."""
     if extracted is not None and extracted == extracted:  # not NaN
@@ -150,6 +190,8 @@ def use_case_checks(title, use_cases, ram_gb=None, storage_gb=None):
         checks.append((5.0 if needs["gpu"] >= 0.5 else 2.5, min(1.0, gpu_level(title) / needs["gpu"])))
     if needs.get("cpu", 0) > 0:
         checks.append((1.5, min(1.0, cpu_level(title) / needs["cpu"])))
+    if needs.get("battery", 0) > 0:
+        checks.append((4.0, min(1.0, battery_level(title) / needs["battery"])))
     ram = ram_from_title(title, ram_gb)
     checks.append((1.5, 0.5 if ram is None else float(ram >= needs["ram_gb"])))
     if storage_gb is not None and storage_gb == storage_gb:
@@ -169,6 +211,8 @@ def fails_key_need(title, use_cases):
     if needs.get("gpu", 0) > 0 and gpu_level(title) / needs["gpu"] < 0.5:
         return True
     if needs.get("cpu", 0) > 0 and cpu_level(title) / needs["cpu"] < 0.5:
+        return True
+    if needs.get("battery", 0) > 0 and battery_level(title) / needs["battery"] < 0.5:
         return True
     return False
 

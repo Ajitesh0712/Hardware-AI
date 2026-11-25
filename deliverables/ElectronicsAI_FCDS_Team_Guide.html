@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ElectronicsAI FCDS Team Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (max 980px) with a sticky section bar; each module carries its owner's colour */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --fg: #172033;
+  --muted: #55627a;
+  --line: #d8dee8;
+  --accent: #0f6f78;
+  --code-bg: #eef2f7;
+  --mod-a: #0f7a6c;  --mod-a-soft: #e2f3f0;
+  --mod-b: #6a4fc2;  --mod-b-soft: #ece8fa;
+  --mod-c: #b4630a;  --mod-c-soft: #fbefdf;
+  --mod-d: #b83a5e;  --mod-d-soft: #f9e6ec;
+  --ok: #1d7a3a;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161f; --surface: #182030; --fg: #e5eaf2; --muted: #9aa6ba; --line: #2b3548;
+    --accent: #4fc1c9; --code-bg: #1f293b;
+    --mod-a: #4cc9b5; --mod-a-soft: #15302d; --mod-b: #a995f2; --mod-b-soft: #262040;
+    --mod-c: #f0a24a; --mod-c-soft: #33261a; --mod-d: #f07c9c; --mod-d-soft: #36202a;
+    --ok: #5fcf83; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161f; --surface: #182030; --fg: #e5eaf2; --muted: #9aa6ba; --line: #2b3548;
+  --accent: #4fc1c9; --code-bg: #1f293b;
+  --mod-a: #4cc9b5; --mod-a-soft: #15302d; --mod-b: #a995f2; --mod-b-soft: #262040;
+  --mod-c: #f0a24a; --mod-c-soft: #33261a; --mod-d: #f07c9c; --mod-d-soft: #36202a;
+  --ok: #5fcf83; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15.5px; line-height: 1.6; }
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.6rem; }
+h3 { font-size: 1.22rem; font-weight: 600; margin: 1.8rem 0 0.6rem; }
+h4 { font-size: 1.02rem; font-weight: 600; margin: 1.2rem 0 0.4rem; }
+p { margin: 0 0 0.9rem; max-width: 70ch; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+pre.block { font-family: var(--font-mono); font-size: 0.83rem; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 0.9rem 1rem; overflow-x: auto; line-height: 1.5; margin: 0 0 1rem; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* header */
+header.top { padding-block: 2.6rem 1.6rem; border-bottom: 1px solid var(--line); background: var(--surface); }
+header.top .lead { font-size: 1.08rem; color: var(--muted); margin-top: 0.8rem; max-width: 66ch; }
+
+/* sticky nav */
+nav.sections { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+nav.sections .wrap { display: flex; gap: 0.35rem; overflow-x: auto; padding-block: 0.55rem; scrollbar-width: thin; }
+nav.sections a { white-space: nowrap; text-decoration: none; color: var(--fg); font-size: 0.86rem; font-weight: 500; padding: 0.3rem 0.65rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+nav.sections a:hover, nav.sections a:focus-visible { border-color: var(--accent); outline: none; }
+nav.sections a .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+
+section.part { padding-block: 2.6rem 1rem; border-bottom: 1px solid var(--line); }
+
+/* team cards */
+.team { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.8rem; margin: 1.2rem 0 1rem; }
+.member { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 10px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.member .who { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
+.member .mod { font-size: 0.88rem; color: var(--muted); }
+.member .loc { font-family: var(--font-mono); font-size: 1.35rem; font-weight: 600; color: var(--c); font-variant-numeric: tabular-nums; margin-top: 0.3rem; }
+.member .loc small { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
+
+/* LOC bars */
+.bars { display: grid; gap: 0.5rem; margin: 0.8rem 0 1.4rem; }
+.bar-row { display: grid; grid-template-columns: 9.5rem 1fr 4.2rem; gap: 0.6rem; align-items: center; font-size: 0.86rem; }
+.bar-track { height: 18px; background: var(--code-bg); border-radius: 4px; overflow: hidden; display: flex; }
+.bar-track span { display: block; height: 100%; }
+.bar-row .n { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 0.5rem 0 1.2rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-display); font-weight: 600; font-size: 0.82rem; background: var(--code-bg); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td.fn { font-family: var(--font-mono); font-size: 0.82rem; white-space: nowrap; }
+td.fn .where { display: block; color: var(--muted); font-size: 0.75rem; }
+td.num { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.unused { font-size: 0.72rem; font-family: var(--font-mono); color: var(--muted); border: 1px dashed var(--line); border-radius: 4px; padding: 0 0.3rem; margin-left: 0.3rem; white-space: nowrap; }
+
+/* module headers */
+.module-head { border-left: 6px solid var(--c); padding: 0.2rem 0 0.2rem 1rem; margin-bottom: 1.2rem; }
+.module-head .owner { font-size: 1rem; color: var(--muted); margin-top: 0.3rem; }
+.module-head .owner b { color: var(--c); }
+.files { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 1rem; }
+.files span { font-family: var(--font-mono); font-size: 0.78rem; background: var(--soft); color: var(--fg); border-radius: 5px; padding: 0.2rem 0.5rem; }
+
+/* step list */
+ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 0.8rem 0 1.2rem; display: grid; gap: 0.6rem; }
+ol.steps > li { counter-increment: step; display: grid; grid-template-columns: 2.1rem 1fr; gap: 0.7rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 0.9rem; }
+ol.steps > li::before { content: counter(step); font-family: var(--font-mono); font-weight: 600; width: 2.1rem; height: 2.1rem; border-radius: 50%; display: grid; place-items: center; background: var(--soft, var(--code-bg)); color: var(--c, var(--accent)); }
+ol.steps > li > div { min-width: 0; }
+ol.steps .tag { font-family: var(--font-mono); font-size: 0.72rem; border-radius: 4px; padding: 0.05rem 0.4rem; margin-left: 0.35rem; color: var(--surface); white-space: nowrap; }
+.tA { background: var(--mod-a); } .tB { background: var(--mod-b); } .tC { background: var(--mod-c); } .tD { background: var(--mod-d); }
+ol.steps .out { display: block; margin-top: 0.35rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* glossary */
+dl.gloss { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.7rem; margin: 0.8rem 0 1rem; }
+dl.gloss div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.85rem; min-width: 0; }
+dl.gloss dt { font-family: var(--font-display); font-weight: 600; margin-bottom: 0.2rem; }
+dl.gloss dd { margin: 0; font-size: 0.88rem; color: var(--muted); }
+
+/* callouts */
+.note { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; padding: 0.7rem 0.9rem; margin: 0.8rem 0 1.1rem; font-size: 0.92rem; }
+.note p { margin: 0; }
+
+/* viva */
+.viva { display: grid; gap: 0.5rem; margin: 0.6rem 0 1.4rem; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.9rem; }
+details summary { cursor: pointer; font-weight: 600; list-style-position: outside; }
+details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+details[open] summary { margin-bottom: 0.4rem; }
+details p { font-size: 0.92rem; color: var(--fg); margin-bottom: 0.4rem; }
+.viva-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.4rem 0; }
+.viva-tools button { font: inherit; font-size: 0.82rem; padding: 0.3rem 0.7rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.viva-tools button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mermaid-box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.8rem; overflow-x: auto; margin: 0.6rem 0 1.2rem; }
+pre.mermaid { margin: 0; background: transparent; }
+
+footer { padding-block: 2rem 3rem; color: var(--muted); font-size: 0.85rem; }
+@media (max-width: 560px) {
+  .bar-row { grid-template-columns: 6.5rem 1fr 3.4rem; font-size: 0.8rem; }
+  ol.steps > li { grid-template-columns: 1fr; }
+  h2 { font-size: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; scroll-padding-top: 4rem; }
+</style>
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">FCDS Project Based Learning · B.Tech IT · 5th semester</div>
+    <h1>ElectronicsAI FCDS Team Guide</h1>
+    <p class="lead">Every member owns at least one data science phase (a notebook) plus the part of the website that is built on it, so each person can answer FCDS questions and explain the live demo. The guide goes from the big picture down to each function, assuming only basic data science (cleaning, EDA, statistics, evaluation).</p>
+  </div>
+</header>
+
+<nav class="sections" aria-label="Sections">
+  <div class="wrap">
+    <a href="#team">Team &amp; split</a>
+    <a href="#basics">Terms to know</a>
+    <a href="#big-picture">Big picture</a>
+    <a href="#one-request">One request, step by step</a>
+    <a href="#module-a"><span class="dot" style="background:var(--mod-a)"></span>A · Ananya</a>
+    <a href="#module-b"><span class="dot" style="background:var(--mod-b)"></span>B · Pawni</a>
+    <a href="#module-c"><span class="dot" style="background:var(--mod-c)"></span>C · Ajitesh</a>
+    <a href="#module-d"><span class="dot" style="background:var(--mod-d)"></span>D · Vedansh</a>
+    <a href="#viva-all">Team viva</a>
+    <a href="#run">Run it</a>
+  </div>
+</nav>
+
+<main>
+<!-- ============================================================ TEAM -->
+<section class="part" id="team">
+  <div class="wrap">
+    <h2>Team and module split</h2>
+    <p>The project has about <b>5,320 lines of code</b> (non-blank, non-comment lines in the Python files, the code cells of the seven notebooks, the web page and the automated tests). Each module pairs FCDS phases with the website code that continues the same idea, and each member owns the tests for their own code.</p>
+
+    <div class="team">
+      <div class="member" style="--c:var(--mod-a)"><span class="eyebrow">Module A · Notebooks 01–02</span><span class="who">Ananya Soni</span><span class="mod">Understanding and cleaning data, parsing the user's request, review insights</span><span class="loc">≈1,370 <small>lines</small></span></div>
+      <div class="member" style="--c:var(--mod-b)"><span class="eyebrow">Module B · Notebooks 03–04</span><span class="who">Pawni Goel</span><span class="mod">EDA and statistics, the web page, chat follow-ups</span><span class="loc">≈1,330 <small>lines</small></span></div>
+      <div class="member" style="--c:var(--mod-c)"><span class="eyebrow">Module C · Notebook 05</span><span class="who">Ajitesh Rajput</span><span class="mod">Feature engineering, live data collection (scraper), processing and storage</span><span class="loc">≈1,390 <small>lines</small></span></div>
+      <div class="member" style="--c:var(--mod-d)"><span class="eyebrow">Module D · Notebooks 06–07</span><span class="who">Vedansh Dwivedi</span><span class="mod">Model development and evaluation, ranking, the Flask API</span><span class="loc">≈1,230 <small>lines</small></span></div>
+    </div>
+
+    <h3>Why each pairing makes sense</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Member</th><th>FCDS phase</th><th>Website part that continues it</th><th>Common idea</th></tr></thead>
+      <tbody>
+        <tr><td><b>Ananya</b></td><td>01 Understanding, 02 Preprocessing</td><td>Parsing the user's request; reading real reviews</td><td>Turning messy text into clean, structured values with regex</td></tr>
+        <tr><td><b>Pawni</b></td><td>03 EDA, 04 Statistics</td><td>The web page that presents results; chat follow-up rules</td><td>Presenting and interpreting data for a reader</td></tr>
+        <tr><td><b>Ajitesh</b></td><td>05 Feature engineering</td><td>Shared feature code, Amazon scraper, data processor, database</td><td>Collecting data and turning it into features, offline and live</td></tr>
+        <tr><td><b>Vedansh</b></td><td>06 Model development, 07 Evaluation</td><td>Loading the model, ranking, the 1–10 score, the Flask API</td><td>Training a model, then using it on new data</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Where each member's lines come from</h3>
+    <div class="legend"><span><i style="background:var(--accent)"></i>notebooks</span><span><i style="background:var(--muted)"></i>backend Python</span><span><i style="background:var(--mod-b)"></i>web page</span><span><i style="background:var(--line)"></i>tests</span></div>
+    <div class="bars" role="img" aria-label="Lines of code per member, split by source">
+      <div class="bar-row"><span>Ananya (A)</span><div class="bar-track"><span style="width:39.9%;background:var(--accent)"></span><span style="width:52.8%;background:var(--muted)"></span><span style="width:5.8%;background:var(--line)"></span></div><span class="n">1,370</span></div>
+      <div class="bar-row"><span>Pawni (B)</span><div class="bar-track"><span style="width:27.3%;background:var(--accent)"></span><span style="width:6.6%;background:var(--muted)"></span><span style="width:57.2%;background:var(--mod-b)"></span><span style="width:4.3%;background:var(--line)"></span></div><span class="n">1,330</span></div>
+      <div class="bar-row"><span>Ajitesh (C)</span><div class="bar-track"><span style="width:6.5%;background:var(--accent)"></span><span style="width:80.1%;background:var(--muted)"></span><span style="width:13.4%;background:var(--line)"></span></div><span class="n">1,390</span></div>
+      <div class="bar-row"><span>Vedansh (D)</span><div class="bar-track"><span style="width:14.2%;background:var(--accent)"></span><span style="width:60.3%;background:var(--muted)"></span><span style="width:13.8%;background:var(--line)"></span></div><span class="n">1,230</span></div>
+    </div>
+
+    <div class="tbl"><table>
+      <thead><tr><th>Member</th><th>Files owned</th><th>Lines</th></tr></thead>
+      <tbody>
+        <tr><td><b>Ananya</b> (A)</td><td>Notebook 01 understanding (115) · Notebook 02 preprocessing (440) · <code>claude_ai.py</code> (415) · <code>product_insights.py</code> (319) · insight tests (~80)</td><td class="num">≈1,370</td></tr>
+        <tr><td><b>Pawni</b> (B)</td><td>Notebook 03 EDA (323) · Notebook 04 statistics (57) · <code>frontend/index.html</code> (796: 336 JavaScript, 298 CSS, 162 HTML) · <code>query_words.py</code> (92) · chat follow-up tests (~60)</td><td class="num">≈1,330</td></tr>
+        <tr><td><b>Ajitesh</b> (C)</td><td>Notebook 05 features (91) · <code>product_features.py</code> (243) · <code>data_processor.py</code> (170) · <code>scrapers/amazon_scraper.py</code> (459) · <code>product_aggregator.py</code> (26) · <code>database.py</code> (216) · test setup and scraper tests (~185)</td><td class="num">≈1,390</td></tr>
+        <tr><td><b>Vedansh</b> (D)</td><td>Notebook 06 model (126) · Notebook 07 evaluation (72) · <code>ml_model.py</code> (48) · <code>recommendation_engine.py</code> (217) · <code>use_cases.py</code> (179) · <code>app.py</code> (395) · ranking and API tests (~190)</td><td class="num">≈1,230</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note"><p>Not counted: <code>amazon_api.py</code>, <code>test_api.py</code> and <code>test_scraper.py</code>, old experiments the current app never runs. The chat follow-up rules (<code>_classify_refinement_context</code>) live in <code>app.py</code> (Vedansh's file), but Pawni explains them because they decide what the chat on her web page does. The totals vary by about ±7% because each notebook stays with one person.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ BASICS -->
+<section class="part" id="basics">
+  <div class="wrap">
+    <h2>Terms to know first</h2>
+    <p>Everyone should be comfortable with these before reading their module. They come up in every viva.</p>
+    <dl class="gloss">
+      <div><dt>Regular expression (regex)</dt><dd>A text pattern. <code>(\d{1,3})\s*gb\s*ram</code> finds “16GB RAM” and captures 16. The project uses regex to read prices, specs, budgets and model names from text.</dd></div>
+      <div><dt>Web scraping</dt><dd>Downloading a web page's HTML and reading values out of it. We use <code>requests</code> to download and <code>BeautifulSoup</code> to find elements such as the title or price.</dd></div>
+      <div><dt>API and JSON</dt><dd>An API is a URL the web page calls to get data. Our Flask backend answers <code>POST /api/recommend</code> with JSON, a text format of keys and values that JavaScript can read.</dd></div>
+      <div><dt>Flask</dt><dd>A small Python web framework. A function marked <code>@app.route("/api/recommend")</code> runs every time that URL is called.</dd></div>
+      <div><dt>Feature</dt><dd>One numeric input to a model, for example <code>ram_gb</code> or <code>price_log1p</code>. Feature engineering turns raw text into such numbers.</dd></div>
+      <div><dt>log1p transform</dt><dd><code>log(1 + x)</code>. Shrinks huge values (₹1,27,999 or 4 lakh ratings) so they don't dominate. The “1 +” keeps zero valid.</dd></div>
+      <div><dt>Regression</dt><dd>Predicting a number instead of a class. Our model predicts a score between 0 and 1.</dd></div>
+      <div><dt>Proxy target</dt><dd>A stand-in label built by a formula, because the data has no true “how good is this product” column. Ours mixes rating, popularity and discount.</dd></div>
+      <div><dt>Random Forest</dt><dd>Many decision trees, each trained on random rows and features; their predictions are averaged. Usually more stable than one tree.</dd></div>
+      <div><dt>Imputation</dt><dd>Filling missing values before training. <code>SimpleImputer(strategy="median")</code> fills each gap with that column's median from the training data.</dd></div>
+      <div><dt>Data leakage</dt><dd>When information from the test data sneaks into training, making results look better than they are. Grouped splitting and fitting the imputer only on training data prevent it.</dd></div>
+      <div><dt>GroupShuffleSplit</dt><dd>A train/test split that keeps whole groups together. Colour variants of one phone always go to the same side, so the model is tested on truly unseen products.</dd></div>
+      <div><dt>MAE, RMSE, R²</dt><dd>MAE: average size of the error. RMSE: like MAE but punishes big errors more. R²: share of the variation explained (1 is perfect, 0 is no better than always guessing the mean).</dd></div>
+      <div><dt>Mann–Whitney U and Spearman ρ</dt><dd>Non-parametric statistics that work on ranks, so they don't need normally distributed data. Mann–Whitney compares two groups; Spearman measures a monotonic relationship.</dd></div>
+      <div><dt>joblib</dt><dd>Saves a trained Python object (our model pipeline) to a file and loads it back later, so the website never retrains.</dd></div>
+      <div><dt>Mocking</dt><dd>In tests, replacing a real service (Amazon, MySQL) with a fake that returns fixed data, so tests are fast and repeatable.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============================================================ BIG PICTURE -->
+<section class="part" id="big-picture">
+  <div class="wrap">
+    <h2>The big picture: two pipelines</h2>
+    <p>ElectronicsAI has two separate data flows that meet at one shared file of feature code and one saved model file. The colours show who owns each part.</p>
+    <div class="mermaid-box">
+<pre class="mermaid">
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+  subgraph OFF["Offline: Data Science notebooks"]
+    K[(Kaggle electronics.csv<br/>5,010 rows)] --> N1["01 Understanding · A"]
+    N1 --> N2["02 Preprocessing · A"]
+    N2 --> N3["03 EDA · B"]
+    N3 --> N4["04 Statistics · B"]
+    N4 --> N5["05 Feature engineering · C"]
+    N5 --> N6["06 Model development · D"]
+    N6 --> N7["07 Evaluation · D"]
+  end
+  PF{{"product_features.py · C<br/>shared feature code"}}
+  N5 -.uses.-> PF
+  N6 --> M[("product_score.joblib · D")]
+  subgraph LIVE["Live: website"]
+    U["Web page · B"] --> Q["Parse request · A"]
+    Q --> S["Scrape Amazon · C"]
+    S --> P["Clean + features · C"]
+    P --> R["Rank + score · D"]
+    R --> X["Explain top 3 · A"]
+    X --> U
+  end
+  P -.uses.-> PF
+  M -.predicts.-> R
+</pre>
+    </div>
+    <div class="note"><p><b>Why the shared file matters.</b> A model only gives sensible predictions if live products are turned into features exactly the way training data was. Both pipelines import <code>product_features.py</code> (Ajitesh), and the saved model (Vedansh) stores its feature order. If the live order ever differs, the app refuses to use the model and falls back to a neutral score.</p></div>
+
+    <h3>What the user sees, and who owns it</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>On the page</th><th>Comes from</th><th>Owner</th></tr></thead>
+      <tbody>
+        <tr><td>Title, price, stars, rating count, specs</td><td>Real Amazon data, scraped live</td><td>Ajitesh</td></tr>
+        <tr><td>“8/10 match” badge and the order of products</td><td>Rule-based need checks first; the Random Forest score breaks ties</td><td>Vedansh</td></tr>
+        <tr><td>“Why it fits you”, “Things to know”, customer comments</td><td>Specs and real reviews from the product page, explained by rules</td><td>Ananya</td></tr>
+        <tr><td>Chat summary line</td><td><code>generate_recommendation_summary</code></td><td>Ananya</td></tr>
+        <tr><td>The page itself, the chat, moving between products</td><td><code>frontend/index.html</code></td><td>Pawni</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============================================================ ONE REQUEST -->
+<section class="part" id="one-request">
+  <div class="wrap">
+    <h2>One request, step by step</h2>
+    <p>Follow the query <code>gaming laptop under 80000</code> from the browser to the screen. The coloured tag shows who owns each step. Learn this sequence as a team: it is the most likely viva question.</p>
+    <ol class="steps">
+      <li><div><b>The page sends the query</b> <span class="tag tB">Pawni</span><br><code>triggerSearch()</code> → <code>startLoadingAnimation()</code> → <code>fetchRecommendations()</code> posts JSON to <code>/api/recommend</code>.<span class="out">{"query": "gaming laptop under 80000", "session_id": "…"}</span></div></li>
+      <li><div><b>Flask receives it</b> <span class="tag tD">Vedansh</span><br><code>recommend_products()</code> in <code>app.py</code> reads the JSON. An empty or non-JSON body gets a clear 400 error.</div></li>
+      <li><div><b>The request is understood</b> <span class="tag tA">Ananya</span><br><code>parse_user_requirements()</code> calls <code>infer_category_from_text()</code>, <code>parse_budget_limits()</code>, <code>_extract_hardware_models()</code>, <code>_local_priority_specs()</code> and <code>detect_use_cases()</code>.<span class="out">{category: "laptop", budget_max: 80000, use_cases: ["gaming"], required_models: [], search_query: "gaming laptop"}</span></div></li>
+      <li><div><b>A short Amazon search is built</b> <span class="tag tB">Pawni</span> <span class="tag tD">Vedansh</span><br><code>clean_search_text()</code> drops filler words; <code>_laptop_query_for_use_cases()</code> turns the use into hardware words with <code>laptop_search_hint()</code>.<span class="out">"laptop rtx 4060 16gb ram"</span></div></li>
+      <li><div><b>Amazon is searched</b> <span class="tag tD">Vedansh</span> <span class="tag tC">Ajitesh</span><br><code>_search_store()</code> → <code>search_products()</code> → <code>search_amazon()</code> (cache and pause check) → <code>_search_amazon_live()</code>. Each result card is read by <code>parse_product()</code>. If nothing comes back, one shorter retry runs (<code>_simpler_query()</code>).<span class="out">list of ~16 dicts: asin, product_title, product_price, product_star_rating, product_num_ratings, product_url …</span></div></li>
+      <li><div><b>Products are cleaned and features extracted</b> <span class="tag tC">Ajitesh</span><br><code>process_products()</code> cleans numbers, drops listings without a price, calls <code>classify_product()</code> and <code>extract_title_specs()</code>, then applies exact-model, RAM/storage and budget filters.</div></li>
+      <li><div><b>Products are scored and ranked</b> <span class="tag tD">Vedansh</span><br><code>recommend()</code> keeps the right category, computes <code>predict_score()</code> (Random Forest), an intent score, and <code>fit_score_out_of_10()</code>. It sorts by match score, breaks ties with the blended score and removes near-duplicates. Top 6 are kept.</div></li>
+      <li><div><b>Results become JSON and get their badge</b> <span class="tag tC">Ajitesh</span> <span class="tag tD">Vedansh</span><br><code>products_to_dict_list()</code> and <code>get_match_label()</code>.<span class="out">"match_label": "9/10 match"</span></div></li>
+      <li><div><b>The top 3 are explained</b> <span class="tag tD">Vedansh</span> <span class="tag tC">Ajitesh</span> <span class="tag tA">Ananya</span><br><code>_enrich_products_with_reviews()</code> reads each product page once with <code>get_product_page_info()</code>, then <code>why_it_fits()</code>, <code>things_to_know()</code> and <code>review_snippets()</code> write the three boxes.</div></li>
+      <li><div><b>Summary, saving and reply</b> <span class="tag tA">Ananya</span> <span class="tag tC">Ajitesh</span> <span class="tag tD">Vedansh</span><br><code>generate_recommendation_summary()</code> writes the chat line; <code>save_query()</code> and friends store it if MySQL is running; Flask returns the JSON.</div></li>
+      <li><div><b>The page shows the products</b> <span class="tag tB">Pawni</span><br><code>updateProductUI()</code> fills the name, price, gauge, specs, boxes and comments; <code>nextProduct()</code>/<code>prevProduct()</code> move between results.</div></li>
+    </ol>
+    <h3>A follow-up message</h3>
+    <p>Typing “under 70000” in the chat calls <code>refineSearch()</code> → <code>POST /api/refine</code> with the previous requirements. <code>refine_search()</code> decides with <code>_classify_refinement_context()</code> whether this is a <b>refinement</b> (keep the search, change the budget), a <b>new search</b> (“ps5” after a laptop search) or an <b>accessory</b> search (“controller” after “playstation 5”). Then steps 4–11 run again.</p>
+    <h3>When things go wrong</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Situation</th><th>Response</th><th>Function</th></tr></thead>
+      <tbody>
+        <tr><td>Amazon shows a robot check</td><td>503 with “wait about N minutes”; Amazon is not asked again for 10 minutes</td><td><code>_looks_blocked</code>, <code>_pause_after_block</code>, <code>_store_error_response</code></td></tr>
+        <tr><td>Network or other store failure</td><td>502 with a plain message</td><td><code>_store_error_response</code></td></tr>
+        <tr><td>No products at all</td><td>404 “No products found”</td><td><code>recommend_products</code></td></tr>
+        <tr><td>Products found but none match a follow-up</td><td>200 with an empty list; the page clears old results</td><td><code>refine_search</code>, <code>refineSearch()</code></td></tr>
+        <tr><td>MySQL not running</td><td>Search still works; saving is skipped</td><td><code>track_interaction</code>, try/except around saves</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============================================================ MODULE A -->
+<section class="part" id="module-a" style="--c:var(--mod-a);--soft:var(--mod-a-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">Module A · ≈1,370 lines · Notebooks 01–02</div><h2>Understanding and cleaning data</h2><div class="owner">Owner: <b>Ananya Soni</b></div></div>
+    <div class="files"><span>01_data_understanding.ipynb</span><span>02_preprocessing.ipynb</span><span>backend/claude_ai.py</span><span>backend/product_insights.py</span><span>ProductInsightTests</span></div>
+    <p>Your theme is turning messy text into clean, structured values. Offline, you inspect and clean the Kaggle dataset. Live, you apply the same skill twice: turning the user's sentence into requirements, and turning real reviews and specs into the explanations a user reads.</p>
+
+    <div class="mermaid-box">
+<pre class="mermaid">
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+  A[(electronics.csv<br/>5,010 × 10, all text)] --> B[01 Inspect<br/>types, missing, duplicates]
+  B --> C[02 Stage 1: clean<br/>prices, ratings, counts]
+  C --> D[Stage 2: missing flags,<br/>discount features]
+  D --> E[Stage 3–4: IQR outliers,<br/>repeated listings]
+  E --> F[(analysis_ready.csv<br/>5,010 × 17)]
+  F --> G[To Pawni: EDA + statistics]
+</pre>
+    </div>
+
+    <h3>Notebook 01: dataset understanding</h3>
+    <p>Loads the CSV with <code>pd.read_csv</code> and checks <code>shape</code>, <code>dtypes</code>, <code>isnull().sum()</code>, <code>duplicated()</code>, value counts and sample titles. Key findings you must remember:</p>
+    <ul>
+      <li>5,010 rows × 10 columns; every column is text because of “₹”, commas and “out of 5 stars”.</li>
+      <li>Missing: discount_price 270, no_of_ratings 34, actual_price 31, review_text 3. No exact duplicate rows, but 685 rows share a title (288 titles).</li>
+      <li><code>main_category</code> and <code>sub_category</code> have one value each, so categories must come from titles.</li>
+      <li><code>review_rating</code> is always a whole 1–5: it is <b>one review's stars</b>, not the product average. 74.5% are 5-star.</li>
+      <li>18 review counts say “FREE Delivery by Amazon”, a scraping error in the dataset.</li>
+    </ul>
+
+    <h3>Notebook 02: preprocessing (five stages, no rows deleted)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Function / step</th><th>What it does</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">clean_price(value)<span class="where">Stage 1</span></td><td>Removes everything except digits and “.”, returns a float or NaN.</td><td>“₹10,999” → 10999.0</td></tr>
+        <tr><td class="fn">clean_rating(value)<span class="where">Stage 1</span></td><td>Takes the first number; keeps it only if 0–5.</td><td>“4.0 out of 5 stars” → 4.0</td></tr>
+        <tr><td class="fn">clean_review_count(value)<span class="where">Stage 1</span></td><td>Removes commas, expands K/M, returns int or NaN.</td><td>“1.2K” → 1200; “FREE Delivery…” → NaN</td></tr>
+        <tr><td class="fn">clean_title(value)<span class="where">Stage 1</span></td><td>Lower case, single spaces.</td><td>“Redmi  10 Power” → “redmi 10 power”</td></tr>
+        <tr><td class="fn">missing indicators<span class="where">Stage 2</span></td><td>New 0/1 columns record which values were missing, instead of inventing values.</td><td><code>discount_price_missing</code></td></tr>
+        <tr><td class="fn">price_available, discount_amount, discount_percent<span class="where">Stage 2</span></td><td>Only for the 4,740 rows with both prices: amount = actual − discount; percent = amount / actual × 100.</td><td>18,999 → 10,999 = 42.1%</td></tr>
+        <tr><td class="fn">IQR outlier table<span class="where">Stage 3</span></td><td>Flags values below Q1 − 1.5·IQR or above Q3 + 1.5·IQR for investigation only.</td><td>633 discount prices flagged</td></tr>
+        <tr><td class="fn">repeated-listing analysis<span class="where">Stage 4</span></td><td>Groups by title; counts unique links, prices and ratings per title.</td><td>710 rows / 300 titles (after lower-casing)</td></tr>
+        <tr><td class="fn">final missing report<span class="where">Stage 5</span></td><td>Recomputes flags, asserts 5,010 rows, saves <code>electronics_analysis_ready.csv</code>.</td><td>5,010 × 17</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Live side 1: understanding the request (<code>claude_ai.py</code>)</h3>
+    <p>The same cleaning idea applied to the user's sentence: regex pulls out the category, budget, exact models and uses.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Function</th><th>Input → output</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">infer_category_from_text(text)</td><td>→ “laptop”, “mobile”, … or None</td><td>Ordered regex table. Graphics cards checked first; a bare “RTX 3060” means laptop.</td></tr>
+        <tr><td class="fn">_extract_hardware_models(text)</td><td>→ ["rtx 4060"]</td><td>Exact models: RTX/GTX/RX, i5-12450H, Ryzen, Core Ultra, Apple M1–M5, iPhone, Galaxy, Pixel, OnePlus.</td></tr>
+        <tr><td class="fn">parse_budget_limits(text)</td><td>→ {budget_min, budget_max}</td><td>“between 40k and 60k”, “50000-70000”, “under 80000”, “above 1 lakh”. Handles k, thousand, lakh.</td></tr>
+        <tr><td class="fn">_remove_budget_words(text)</td><td>→ text</td><td>Strips “under 80000” so it isn't sent to Amazon as words.</td></tr>
+        <tr><td class="fn">_local_priority_specs(text)</td><td>→ specs dict</td><td>RAM, storage, GPU needed, battery and portability wishes.</td></tr>
+        <tr><td class="fn">_infer_use_case(text)</td><td>→ one label</td><td>Main use for ranking weights (gaming, coding, student…).</td></tr>
+        <tr><td class="fn">parse_user_requirements(text)</td><td>sentence → requirements</td><td>Without a Gemini key: local rules only. With a key: asks Gemini for JSON, then local rules overwrite category, budget, models and uses, which are deterministic.</td></tr>
+        <tr><td class="fn">generate_recommendation_summary</td><td>→ chat line</td><td>“I found 6 laptops for gaming under ₹80,000.”</td></tr>
+        <tr><td class="fn">has_gemini_key()</td><td>→ bool</td><td>Ignores placeholder keys like “your_key”.</td></tr>
+        <tr><td class="fn">analyze_product_sentiment <span class="unused">not used</span></td><td colspan="2">Old Gemini review summariser; replaced by the rule-based insights below.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Live side 2: review insights (<code>product_insights.py</code>)</h3>
+    <p>Fills the three boxes on the product page for the top 3 results. Every sentence comes from the spec table, the user's request, or counted review mentions. Nothing is generated by AI, and all text is HTML-escaped before it reaches the page.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Function</th><th>Input → output</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">_spec(specs, *names)</td><td>spec dict, names → value</td><td>Finds a spec by exact name first, then partial. Exact-first stops “RAM Size” from matching “Graphics RAM Size”.</td></tr>
+        <tr><td class="fn">_number, _weight_kg</td><td>text → float</td><td>First number in a string; weight converted from grams to kg when needed.</td></tr>
+        <tr><td class="fn">_gpu_name, _vram_gb, _cpu_name, _ram_gb, _storage_gb</td><td>title + specs → value</td><td>Read hardware facts from the spec table, falling back to the title.</td></tr>
+        <tr><td class="fn">_has_dedicated_gpu</td><td>title, specs → bool</td><td>True for any RTX/GTX/Radeon RX card or “Graphics: Dedicated”.</td></tr>
+        <tr><td class="fn">_sentences(text)</td><td>review → parts</td><td>Splits at full stops, “but”, “however”, “Pros:” and “Cons:” so each part is judged alone.</td></tr>
+        <tr><td class="fn">review_themes(reviews)</td><td>reviews → (praised, criticised, total)</td><td>For each aspect (battery, display, heat, …) checks positive and negative cue words; falls back to the review's stars. Counts reviews per aspect.</td></tr>
+        <tr><td class="fn">_theme_sentence, review_snippets</td><td>→ text</td><td>“Reviewers praise: display (3 of 8)” and “5/5 stars: …” lines.</td></tr>
+        <tr><td class="fn">_gpu_reason, _battery_reasons</td><td>facts + uses → sentences</td><td>Explains what a GPU means for gaming, 3D or video; battery points for students.</td></tr>
+        <tr><td class="fn">why_it_fits(product, req, page)</td><td>→ list of lines</td><td>Model match, GPU, CPU, RAM vs need, storage, refresh rate, budget headroom, rating, praise.</td></tr>
+        <tr><td class="fn">_laptop_cautions, things_to_know</td><td>→ list of lines</td><td>Battery under load, heat and fans, weight, low VRAM, RAM below need, macOS gaming, few ratings, complaints.</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Your tests</b> (<code>ProductInsightTests</code>) use a real Lenovo LOQ spec table to check the GPU sentence, battery warning, weight, upgradable RAM, review counts and HTML escaping.</p>
+
+    <h3>Viva questions for Ananya</h3>
+    <div class="viva">
+      <details><summary>Why are all 10 columns read as text?</summary><p>Prices contain “₹” and commas, ratings contain “out of 5 stars” and counts contain commas, so Pandas cannot parse them as numbers. Stage 1 of preprocessing converts them.</p></details>
+      <details><summary>Why did missing review counts go from 34 to 52 after cleaning?</summary><p>18 cells had the text “FREE Delivery by Amazon”. They contain no number, so <code>clean_review_count</code> returns NaN for them. 34 + 18 = 52.</p></details>
+      <details><summary>Why didn't you fill missing prices with the mean?</summary><p>Filling would invent values and hide which products truly lacked data. We kept them missing, added indicator columns, and only computed discounts where both prices exist. The model later uses a median imputer fitted on training data only.</p></details>
+      <details><summary>Why weren't IQR outliers deleted?</summary><p>A very high price is usually a real premium product (a flagship phone), not an error. Deleting it would remove genuine data, so outliers were only investigated.</p></details>
+      <details><summary>Why are repeated titles not treated as duplicates?</summary><p>No row is an exact copy. Repeated titles often have different prices, ratings or links, so they are separate listings. Phase 6 handles them by keeping each product's listings on one side of the train/test split.</p></details>
+      <details><summary>What does review_rating really measure, and why does it matter?</summary><p>One sampled review's stars (always 1–5), not the product's average. Analyses and the model's “rating” feature therefore use a noisy single-review signal, and live Amazon ratings (averages) mean something slightly different.</p></details>
+      <details><summary>How does “laptop under 50k” become a budget?</summary><p><code>parse_budget_limits</code> matches “under” followed by a number and optional “k”, “thousand” or “lakh”, multiplies (50 × 1,000) and returns budget_max = 50000.</p></details>
+      <details><summary>Why not rely only on Gemini to understand queries?</summary><p>An API can be unavailable, slow or unconfigured, and an LLM can return inconsistent JSON. Category, budget, models and uses come from deterministic rules so results are predictable; Gemini only adds extra interpretation when a key exists.</p></details>
+      <details><summary>How does review_themes decide praise or complaint?</summary><p>It splits each review into parts, finds aspect words (battery, screen, heat…), then looks for negative cues (bad, issue, drains) or positive cues (good, smooth, great). With no cue it uses the review's stars: 4–5 praise, 1–2 complaint.</p></details>
+      <details><summary>Why is the review text HTML-escaped?</summary><p>The page inserts these lines as HTML. Escaping turns “&lt;script&gt;” into harmless text, so a malicious review or spec value cannot run code in the user's browser.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ MODULE B -->
+<section class="part" id="module-b" style="--c:var(--mod-b);--soft:var(--mod-b-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">Module B · ≈1,330 lines · Notebooks 03–04</div><h2>Exploring data and presenting results</h2><div class="owner">Owner: <b>Pawni Goel</b></div></div>
+    <div class="files"><span>03_eda.ipynb</span><span>04_statistical_analysis.ipynb</span><span>frontend/index.html</span><span>backend/query_words.py</span><span>chat follow-up tests</span><span>explains: _classify_refinement_context</span></div>
+    <p>Your theme is presenting and interpreting data for a reader. Offline, you explore the cleaned data with plots and test relationships statistically. Live, you own the web page that presents results, and the rules that decide what a chat follow-up means.</p>
+
+    <div class="mermaid-box">
+<pre class="mermaid">
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+  F[(analysis_ready.csv<br/>from Ananya)] --> G[03 EDA<br/>10 plots]
+  F --> H[04 Statistics]
+  H --> H1[describe, skewness, IQR]
+  H --> H2[Spearman correlation]
+  H --> H3[Mann–Whitney U test]
+  G --> I[(eda_dataset.csv<br/>to Ajitesh)]
+</pre>
+    </div>
+
+    <h3>Notebook 03: exploratory data analysis</h3>
+    <p>Ten plots saved in <code>Data Science/eda_outputs/</code>: category bar chart, raw and log price histograms, rating count plot, discount histogram, four box plots, Pearson correlation heatmap, two scatter plots and median price by category. Main findings:</p>
+    <ul>
+      <li>Prices are right-skewed: mean ₹3,078 vs median ₹649 (a few phones and laptops pull the mean up).</li>
+      <li>Ratings cluster at 5 (mean 4.49). Median discount ≈ 56%. Review counts range from 1 to 437,651 (median 2,321).</li>
+      <li>Correlations: discount price vs actual price r = 0.96; rating vs price, review count and discount ≈ 0; discount % vs discount price r ≈ −0.31. Correlation is not causation.</li>
+      <li>27 inferred categories; 1,076 titles unclassified; laptops have the highest median price (₹41,240).</li>
+    </ul>
+
+    <h3>Notebook 04: statistical analysis</h3>
+    <ul>
+      <li><b>Descriptive table</b>: mean, median, mode, variance, standard deviation, skewness, IQR. Skewness: discount price 6.74 (long right tail), rating −2.33 (piled at the top).</li>
+      <li><b>IQR outliers</b>: 633 discount prices (13.4%), 632 actual prices (12.7%), 681 review counts (13.7%); flagged, not deleted.</li>
+      <li><b>Spearman correlation</b> (<code>spearmanr</code>): rating vs discount price ρ = −0.015 (p = 0.31), vs discount % ρ = 0.018 (p = 0.22), vs number of ratings ρ = −0.086 (p &lt; 0.001, significant but tiny).</li>
+      <li><b>Mann–Whitney U</b> (<code>mannwhitneyu</code>): split at median discount into two groups of 2,370. H₀: same rating distribution. α = 0.05. U = 2,833,249.5, p = 0.491, rank-biserial r = 0.009 → fail to reject H₀.</li>
+      <li>Rank-biserial effect size = <code>2U/(n1·n2) − 1</code>; positive means the high-discount group is rated slightly higher.</li>
+    </ul>
+
+    <h3>Live side 1: the web page (<code>frontend/index.html</code>)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>JavaScript function</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">generateSessionId, loadHistory, resumeSession, clearHistory</td><td>Random session ID and recent searches kept in the browser's localStorage.</td></tr>
+        <tr><td class="fn">triggerSearch</td><td>Reads the search box and starts a search.</td></tr>
+        <tr><td class="fn">startLoadingAnimation(query)</td><td>Shows the progress bar while <code>fetchRecommendations</code> runs; shows results, or returns to the home view with a message.</td></tr>
+        <tr><td class="fn">fetchRecommendations(query)</td><td><code>POST /api/recommend</code>; throws the server's error message if the status isn't OK.</td></tr>
+        <tr><td class="fn">refineSearch</td><td><code>POST /api/refine</code> with <code>currentRequirements</code>; clears old products when nothing matches.</td></tr>
+        <tr><td class="fn">updateProductUI</td><td>Shows one product: short name, price, gauge (<code>match_label</code>, coloured by <code>match_score</code>), specs, the three insight boxes, comments.</td></tr>
+        <tr><td class="fn">nextProduct, prevProduct</td><td>Move between the ranked results.</td></tr>
+        <tr><td class="fn">addChatMessage, showToast, goHome</td><td>Chat bubbles, pop-up messages, back to the start view.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Live side 2: word helpers (<code>query_words.py</code>)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Function / set</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">normalize_text(text)</td><td>Lower case, removes ® ™, writes “PlayStation 5” as “ps5” so both spellings match.</td></tr>
+        <tr><td class="fn">key_words(text)</td><td>Meaningful words without fillers, numbers or specs: “i need sony playstation 5” → [sony, ps5].</td></tr>
+        <tr><td class="fn">product_words(text)</td><td>Key words minus refinement words (gaming, battery, i5…).</td></tr>
+        <tr><td class="fn">clean_search_text(text)</td><td>Removes filler words before searching but keeps budget words for the budget parser.</td></tr>
+        <tr><td class="fn">looks_like_addon(title, wanted, typed)</td><td>Marks controllers, cases, “for PS5” items and game editions as add-ons unless the user asked for them. Ignores “with controller” bundles.</td></tr>
+        <tr><td class="fn">FILLER / REFINEMENT / ACCESSORY / BUDGET word sets</td><td>The vocabularies the rules above rely on.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Chat follow-ups: <code>_classify_refinement_context</code> (in app.py)</h3>
+    <ol class="steps">
+      <li><div><b>New search</b> if the message says “instead / new search”, names a different category, a different exact model, a new brand, or a product word not in the previous search (“ps5” after “rtx 5090”).</div></li>
+      <li><div><b>Accessory</b> if the only new words are add-ons (“controller”, “case”, “game”). The search becomes previous product + accessory: “sony ps5 controller”.</div></li>
+      <li><div><b>Refinement</b> otherwise (“under 70000”, “gaming”, “with i5”, “better battery”). Old requirements are kept and merged with the new ones; a new budget replaces the old one.</div></li>
+    </ol>
+    <p><b>Your tests</b>: budget-only follow-up keeps the RTX 4060 filter, a new model replaces the old one, “ps5” after “rtx 5090” starts a new search, “controller” searches for the PS5 controller, “with i5” stays a refinement, a new budget replaces the old one.</p>
+
+    <h3>Viva questions for Pawni</h3>
+    <div class="viva">
+      <details><summary>Why use a log scale for price histograms?</summary><p>Prices are heavily right-skewed. On a log scale the many cheap items and the few expensive ones are both visible.</p></details>
+      <details><summary>What does a skewness of 6.74 for discount price tell you?</summary><p>The distribution has a long right tail: most products are cheap and a few are very expensive. That is why the mean (₹3,078) is far above the median (₹649), and the median is the better “typical” value.</p></details>
+      <details><summary>Why Mann–Whitney instead of a t-test?</summary><p>Ratings are bounded, discrete and not normal (most are 5). Mann–Whitney compares ranks and does not assume normality.</p></details>
+      <details><summary>State your hypotheses and conclusion.</summary><p>H₀: high- and low-discount products have the same rating distribution; H₁: they differ. With α = 0.05 and p = 0.491 we fail to reject H₀: no evidence of a difference. That does not prove they are identical, and it says nothing about cause.</p></details>
+      <details><summary>The Spearman result for reviews vs rating was significant. Is it important?</summary><p>No. ρ = −0.086 is tiny; it is significant only because n ≈ 5,000. Statistical significance is not practical importance.</p></details>
+      <details><summary>Why use Spearman as well as Pearson?</summary><p>Pearson measures straight-line relationships and is sensitive to skew and outliers. Spearman uses ranks, so it suits skewed prices and bounded ratings.</p></details>
+      <details><summary>How does the chat know “under 70000” is a refinement but “ps5” is a new search?</summary><p>“under 70000” has no product words, only a budget, so it refines. “ps5” is a product word that was not in the previous search, so it starts a new search and drops the old RTX filter.</p></details>
+      <details><summary>Why normalise “PlayStation 5” to “ps5”?</summary><p>Users and titles use both spellings. Normalising both sides makes the match work either way.</p></details>
+      <details><summary>Where does the badge colour come from?</summary><p>The page colours the gauge from <code>match_score</code> (&gt;80 green, &gt;50 amber, else red). The backend sends match_score = fit × 10, so 9–10 shows green, 6–8 amber, ≤5 red.</p></details>
+      <details><summary>Why does the page send currentRequirements with every follow-up?</summary><p>The backend is stateless: each request is independent. The page sends the previous requirements so the backend can merge them with the new message.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ MODULE C -->
+<section class="part" id="module-c" style="--c:var(--mod-c);--soft:var(--mod-c-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">Module C · ≈1,390 lines · Notebook 05</div><h2>Features and live data collection</h2><div class="owner">Owner: <b>Ajitesh Rajput</b></div></div>
+    <div class="files"><span>05_feature_engineering.ipynb</span><span>backend/product_features.py</span><span>backend/data_processor.py</span><span>backend/scrapers/amazon_scraper.py</span><span>backend/product_aggregator.py</span><span>backend/database.py</span><span>test setup + scraper tests</span></div>
+    <p>Your theme is collecting data and turning it into features. Offline, you engineer categories and specs from Kaggle titles. Live, you collect current Amazon listings and push them through the very same feature code, so the model sees the same kind of input it was trained on.</p>
+
+    <div class="mermaid-box">
+<pre class="mermaid">
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+  T[Kaggle titles] --> CP[classify_product]
+  AZ[Amazon search page] --> PP[parse_product]
+  PP --> PR[process_products]
+  PR --> CP
+  CP --> ES[extract_title_specs]
+  ES --> PF[product_features<br/>16 numbers]
+  PF --> V[To Vedansh:<br/>train + predict]
+</pre>
+    </div>
+
+    <h3>Notebook 05: feature engineering</h3>
+    <ul>
+      <li><b>Categories</b> from <code>classify_product()</code>: ordered regex rules. A laptop must name a laptop <i>and</i> list a processor plus RAM, storage or OS, so “laptop backpack” becomes an accessory.</li>
+      <li><b>Six specs</b> from <code>extract_title_specs()</code>, only for product types where they make sense: RAM, storage, battery mAh, screen inches, charging watts, refresh Hz.</li>
+      <li><b>Validation</b>: 13 hand-checked titles all pass; range checks find 0 impossible values. Coverage is low (RAM 245, storage 263, battery 148, screen 169, charging 220, refresh 40 rows) because titles often omit specs; missing stays missing.</li>
+      <li>Output: <code>electronics_feature_engineered.csv</code>, 5,010 × 24.</li>
+    </ul>
+
+    <h3>Shared feature code (<code>product_features.py</code>)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Function</th><th>Input → output</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">_is_laptop_device(text)</td><td>title → bool</td><td>Laptop word + processor + RAM/storage/OS.</td></tr>
+        <tr><td class="fn">classify_product(title)</td><td>title → category</td><td>Order: non-electronic → laptop → accessories → weak laptop → phone prefix → other categories → headphones … → “Other / Unclassified”.</td></tr>
+        <tr><td class="fn">extract_title_specs(title, cat)</td><td>→ 6 specs (NaN if absent)</td><td>Category-gated regex. Skips “up to 12GB RAM”; screen size only near words like “display”.</td></tr>
+        <tr><td class="fn">_first_number, _numeric</td><td>text → float</td><td>Small number readers used above.</td></tr>
+        <tr><td class="fn">product_features(row)</td><td>dict → 16 features</td><td>Works for both Kaggle columns (name, discount_price) and live columns (product_title, product_price). This keeps training and live consistent.</td></tr>
+        <tr><td class="fn">product_feature_frame(df)</td><td>DataFrame → features</td><td>Applies product_features to every row (used by notebooks 06 and 07).</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Live processing (<code>data_processor.py</code>)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Function</th><th>Input → output</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">process_products(raw, req)</td><td>list → DataFrame</td><td>Renames columns, cleans numbers, keeps missing ratings as NaN, drops no-price rows, classifies, extracts specs, filters exact model (RTX 4060 but not 4060 Ti), RAM/storage and budget, adds a popularity score.</td></tr>
+        <tr><td class="fn">popularity_score<span class="where">in process_products</span></td><td>rating, count → 0–1</td><td>Weighted average that pulls products with few ratings toward the mean, so “5.0 from 2 ratings” doesn't beat “4.5 from 2,000”.</td></tr>
+        <tr><td class="fn">build_feature_vector(row, req)</td><td>→ 7 numbers</td><td>Price vs budget, rating, RAM, storage, GPU, display, popularity, each 0–1 (used by Vedansh's ranking).</td></tr>
+        <tr><td class="fn">products_to_dict_list(df)</td><td>DataFrame → JSON list</td><td>Formats price, specs and scores for the page; missing counts become null (“unavailable”).</td></tr>
+        <tr><td class="fn">_number, _friendly_graphics_name</td><td>→ value / text</td><td>Number cleaner; “RTX 4060” label for the specs panel.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Live collection (<code>scrapers/amazon_scraper.py</code>)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Function</th><th>Input → output</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">search_amazon(query, …)</td><td>query, budget → products</td><td>Returns a cached result (15 min) if available; raises <code>AmazonBlockedError</code> while paused; otherwise calls the live search and caches it.</td></tr>
+        <tr><td class="fn">_search_amazon_live(…)</td><td>→ products</td><td>GETs <code>amazon.in/s?k=…&amp;low-price=…&amp;high-price=…</code>, reads result cards, filters by price and exact model, removes duplicate ASINs. Reads up to 3 pages only for exact-model searches, with a 1-second gap.</td></tr>
+        <tr><td class="fn">_looks_blocked(html)</td><td>html → bool</td><td>Detects CAPTCHA text, the JavaScript challenge page, or a tiny page with no results.</td></tr>
+        <tr><td class="fn">_pause_after_block, minutes_until_retry</td><td>—</td><td>Stops all Amazon requests for 10 minutes after a block, and reports the time left.</td></tr>
+        <tr><td class="fn">_extract_search_models(query)</td><td>→ regex matchers</td><td>Exact-title patterns for RTX/GTX/RX, Intel/AMD chips, Apple M chips, iPhone, Galaxy, Pixel.</td></tr>
+        <tr><td class="fn">_read_title(item)</td><td>card → title</td><td>Takes the longest <code>&lt;h2&gt;</code> and puts the brand in front. Fixes Amazon's layout where the first heading is just “Apple”.</td></tr>
+        <tr><td class="fn">parse_product(item)</td><td>card → dict</td><td>Title, price, rating, review count, URL, image. Missing rating/count become <code>None</code>, never 0. Sponsored links skipped.</td></tr>
+        <tr><td class="fn">parse_price, _parse_review_count</td><td>text → number</td><td>“₹1,34,890” → 134890.0.</td></tr>
+        <tr><td class="fn">get_product_page_info(asin)</td><td>→ {reviews, specs}</td><td>One request to <code>/dp/ASIN</code>, cached; reads reviews with stars and the spec table (Ananya turns these into explanations).</td></tr>
+        <tr><td class="fn">_read_review_blocks, _clean_review_text, _read_spec_table</td><td>soup → data</td><td>Review text without “Read more” boilerplate; spec rows from <code>.prodDetTable</code>.</td></tr>
+        <tr><td class="fn">get_product_details, extract_details, get_product_reviews <span class="unused">not used</span></td><td colspan="2">Older page readers kept in the file; the current flow uses <code>get_product_page_info</code>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Storage and data source</h3>
+    <p><code>database.py</code> (optional MySQL): <code>get_pool</code> and <code>get_connection</code> manage a connection pool; <code>init_db()</code> creates <code>user_queries</code>, <code>products</code>, <code>recommendations</code> and <code>user_interactions</code>; <code>save_query</code>, <code>save_recommendations</code>, <code>upsert_product</code> and <code>log_interaction</code> write to them. The website works without MySQL. <code>get_cached_product</code> and <code>get_recent_queries</code> are not used now.</p>
+    <p><code>product_aggregator.py</code> is a thin layer (<code>search_products</code>, <code>get_product_page</code>) so the data source could later be swapped for an official API without touching <code>app.py</code>.</p>
+    <p><b>Your tests</b>: the shared setup in <code>tests/test_website_pipeline.py</code> (fake product catalogue, <code>FakeStore</code> that stands in for Amazon, mocks for reviews and MySQL) and the scraper tests (missing rating → None, brand-heading titles, blocked-page detection, pause after block, cache, review parsing). Run with <code>python -m unittest discover -s tests -v</code>.</p>
+
+    <h3>Viva questions for Ajitesh</h3>
+    <div class="viva">
+      <details><summary>Why is feature extraction category-aware?</summary><p>“15.6 inch” in a laptop backpack title is not a screen size, and “65W” in a phone title is charging power only near words like “charging”. Gating by category and nearby words prevents such false features.</p></details>
+      <details><summary>Why was the laptop rule changed to need a processor plus RAM/storage?</summary><p>Before, 155 of 188 “laptops” in the training data were bags, tables and mice that mention “laptop”, and real laptops with “DDR5” were labelled components. The stricter rule fixed both.</p></details>
+      <details><summary>Why is spec coverage so low, and is that a problem?</summary><p>Many titles don't list RAM or screen size (RAM found in 245 of 5,010 rows). Missing values are kept as missing and imputed inside the model pipeline. The model's importance for these specs ended up near zero.</p></details>
+      <details><summary>How are training and live features kept consistent?</summary><p>Both call <code>product_features()</code>, which accepts both column naming styles, and the model stores its feature order. Live products go through exactly the same code as Kaggle rows.</p></details>
+      <details><summary>Why did follow-up searches once return nothing even though Amazon had products?</summary><p>Amazon changed its layout so the first <code>&lt;h2&gt;</code> held only the brand. The scraper read “Apple” as the title, so no title contained “M5” and the exact-model filter removed everything. <code>_read_title()</code> now takes the full heading.</p></details>
+      <details><summary>How do you avoid getting blocked by Amazon?</summary><p>Short queries, a 15-minute cache for repeated searches, a 1-second gap between result pages, product pages only for the top 3 and one at a time, and a 10-minute pause after any robot check. We never try to bypass the check.</p></details>
+      <details><summary>Why are missing ratings stored as None instead of 0?</summary><p>0 would mean “zero stars” and would wrongly lower scores; it would also show “0 ratings”. None lets the page say “rating unavailable” and the model's imputer handle it.</p></details>
+      <details><summary>What does the popularity score fix?</summary><p>A product with 2 ratings averaging 5.0 would otherwise beat one with 2,000 ratings averaging 4.5. The weighted average pulls low-count products toward the overall mean.</p></details>
+      <details><summary>Is scraping Amazon allowed?</summary><p>Amazon's Conditions of Use restrict automated data gathering. We use it only for a low-volume academic demo with politeness rules; a real deployment should use an official product API.</p></details>
+      <details><summary>How do the tests run without Amazon or MySQL?</summary><p><code>unittest.mock.patch</code> replaces <code>search_products</code> with <code>FakeStore.search</code>, which returns a fixed catalogue, and replaces the review and database functions with fakes. Gemini is switched off by clearing its key.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ MODULE D -->
+<section class="part" id="module-d" style="--c:var(--mod-d);--soft:var(--mod-d-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">Module D · ≈1,230 lines · Notebooks 06–07</div><h2>Model, ranking and the API</h2><div class="owner">Owner: <b>Vedansh Dwivedi</b></div></div>
+    <div class="files"><span>06_model_development.ipynb</span><span>07_model_evaluation.ipynb</span><span>backend/ml_model.py</span><span>backend/recommendation_engine.py</span><span>backend/use_cases.py</span><span>backend/app.py</span><span>ranking + API tests</span></div>
+    <p>Your theme is training a model and then using it on new data. Offline, you build the target, split the data, compare models and evaluate the winner. Live, you load the saved model, rank products with it and the 1–10 match score, and run the Flask API that ties every module together.</p>
+
+    <div class="mermaid-box">
+<pre class="mermaid">
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+  F[16 features<br/>from Ajitesh] --> TG[Proxy target<br/>0.45 / 0.35 / 0.20]
+  TG --> SP[GroupShuffleSplit<br/>by base title]
+  SP --> CMP[Baseline · Linear ·<br/>Tree · Random Forest]
+  CMP --> SAVE[(joblib artifact)]
+  SAVE --> EV[07 holdout:<br/>MAE RMSE R²]
+  SAVE --> PS[predict_score live]
+  PS --> RK[recommend + fit score]
+</pre>
+    </div>
+
+    <h3>Notebook 06: model development</h3>
+    <ul>
+      <li><b>Target</b> (0–1): <code>0.45 × rating/5 + 0.35 × log1p(reviews)/max + 0.20 × discount/100</code>. A proxy for quality, popularity and discount, not user satisfaction.</li>
+      <li><b>Split</b>: <code>product_group()</code> takes the text before the first “(”, “,” or “|”, so colour variants stay together. Holdout 995 rows; development 4,015 → train 3,223 / validation 792. Zero shared groups. Target constants come from development rows only.</li>
+      <li><b>Models</b> (scikit-learn pipelines with median imputer): mean baseline, Linear Regression (+ scaler), Decision Tree (depth 8, 10 per leaf), Random Forest (300 trees).</li>
+      <li><b>Validation RMSE</b>: Random Forest 0.0140 · Decision Tree 0.0237 · Linear 0.0270 · baseline 0.1171. Random Forest is refitted on all development rows and saved with <code>joblib.dump</code> together with its feature list, target settings and split settings.</li>
+      <li><b>Feature importance</b>: rating 0.61, log reviews 0.24, discount 0.14; specs ≈ 0, because the target is built from those three.</li>
+    </ul>
+
+    <h3>Notebook 07: evaluation</h3>
+    <p>Rebuilds the same split from the saved settings and evaluates once on the holdout: <b>MAE 0.0042, RMSE 0.0093, R² 0.993</b> (development: 0.0027, 0.0063, 0.997). Residuals are centred on zero but wider for low predicted scores (&lt; 0.6). Accuracy is not used because it is a classification metric.</p>
+
+    <h3>Using the model live</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Function</th><th>Input → output</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">_load_artifact()<span class="where">ml_model.py</span></td><td>→ model or False</td><td>Loads the joblib file once; rejects it if the feature order differs from <code>FEATURE_COLUMNS</code>.</td></tr>
+        <tr><td class="fn">predict_score(product)<span class="where">ml_model.py</span></td><td>product → 0–1</td><td>Builds the 16 features, predicts, clips to 0–1. Returns 0.5 if no model.</td></tr>
+        <tr><td class="fn">recommend(df, req, top_n)<span class="where">recommendation_engine.py</span></td><td>→ ranked top N</td><td>Category filter, budget, model score, intent score, fit score, sort, de-duplicate.</td></tr>
+        <tr><td class="fn">_match_score_vector<span class="where">recommendation_engine.py</span></td><td>vector → intent score</td><td>Weighted sum using <code>USE_CASE_WEIGHTS</code> (gaming weights GPU 0.35) plus 10% keyword overlap.</td></tr>
+        <tr><td class="fn">fit_score_out_of_10(row, req)<span class="where">recommendation_engine.py</span></td><td>→ 1–10</td><td>Weighted checks: product type, extra words, model, budget, RAM, storage, use-case hardware. Score = 1 + 9 × share met. Capped at 5 if a key need clearly fails.</td></tr>
+        <tr><td class="fn">_deduplicate_products<span class="where">recommendation_engine.py</span></td><td>→ unique rows</td><td>Same ASIN, or titles with Jaccard word overlap &gt; 0.78 and no differing specs.</td></tr>
+        <tr><td class="fn">get_match_label(fit)<span class="where">recommendation_engine.py</span></td><td>9 → “9/10 match”</td><td>Badge text.</td></tr>
+        <tr><td class="fn">detect_use_cases(text)<span class="where">use_cases.py</span></td><td>→ list</td><td>“video editing and 3d modelling” → ["3d modelling", "video editing"].</td></tr>
+        <tr><td class="fn">combined_needs(uses)<span class="where">use_cases.py</span></td><td>→ needs dict</td><td>Strictest need across uses: max RAM, GPU, CPU, battery.</td></tr>
+        <tr><td class="fn">laptop_search_hint(uses)<span class="where">use_cases.py</span></td><td>→ words</td><td>“rtx 4060 16gb ram”, “long battery life”.</td></tr>
+        <tr><td class="fn">gpu_level, cpu_level, battery_level<span class="where">use_cases.py</span></td><td>title → 0–1</td><td>RTX 4060 ≈ 0.8, RTX 3050 ≈ 0.45; i7 HX ≈ 0.95; U-series battery 0.7, gaming GPU 0.3.</td></tr>
+        <tr><td class="fn">use_case_checks, fails_key_need<span class="where">use_cases.py</span></td><td>→ checks / bool</td><td>Hardware checks for the fit score; flags a GPU, CPU or battery below half the need.</td></tr>
+        <tr><td class="fn">compute_similarity_matrix, model_metadata <span class="unused">not used</span></td><td colspan="2">Old helpers; the current flow never calls them.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>The Flask API (<code>app.py</code>)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Function</th><th>Route / role</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">index()</td><td><code>GET /</code></td><td>Serves <code>frontend/index.html</code>.</td></tr>
+        <tr><td class="fn">recommend_products()</td><td><code>POST /api/recommend</code></td><td>The full first search (steps 2–10 of the walkthrough). Returns 200, 400, 404, 502 or 503.</td></tr>
+        <tr><td class="fn">refine_search()</td><td><code>POST /api/refine</code></td><td>Chat follow-ups: classify context, merge old and new requirements, build the combined query, search and rank again.</td></tr>
+        <tr><td class="fn">track_interaction()</td><td><code>POST /api/interaction</code></td><td>Logs clicks to MySQL; never fails the page if MySQL is down.</td></tr>
+        <tr><td class="fn">health()</td><td><code>GET /api/health</code></td><td>Returns {"status": "ok"} for deployment checks.</td></tr>
+        <tr><td class="fn">_search_store, _simpler_query</td><td>helper</td><td>Calls the store; if empty, retries once with a shorter query. Exact-model filtering only if the user named a model.</td></tr>
+        <tr><td class="fn">_laptop_query_for_use_cases</td><td>helper</td><td>“laptop for video editing” → “laptop rtx 4060 16gb ram” (keeps brand words).</td></tr>
+        <tr><td class="fn">_enrich_products_with_reviews</td><td>helper</td><td>For the top 3, reads the product page once and fills the three boxes (Ananya's functions).</td></tr>
+        <tr><td class="fn">_store_error_response</td><td>helper</td><td>Robot check → 503 with minutes to wait; anything else → 502.</td></tr>
+        <tr><td class="fn">_classify_refinement_context</td><td>helper</td><td>Chat rules (explained by Pawni).</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>Your tests</b>: ranking (RTX 4060 only returns 4060 laptops, MacBook M5 excludes M5 Pro, budgets respected, accessories never shown as laptops, video editing caps no-GPU laptops at 5/10, study + battery ranks efficient laptops first) and API (404, 502, 503 with wait time, non-JSON body, refine without history, MySQL down, empty-search retry, reviews only for the top 3).</p>
+
+    <h3>Viva questions for Vedansh</h3>
+    <div class="viva">
+      <details><summary>Why is the target called a proxy, and what is its weakness?</summary><p>The data has no true label for product quality, so we built one from rating, popularity and discount. Because those same signals are model inputs, the model mostly learns its own formula; the high R² shows consistency, not real recommendation accuracy.</p></details>
+      <details><summary>Why GroupShuffleSplit instead of train_test_split?</summary><p>The same product appears several times (colour variants). A random split would put variants in both train and test, which leaks information. Grouping by base title keeps each product on one side.</p></details>
+      <details><summary>Why is the imputer inside the pipeline?</summary><p>So its medians are learned from training rows only. Fitting it on all data would leak test information.</p></details>
+      <details><summary>Why did Random Forest win?</summary><p>It had the lowest validation RMSE (0.0140). Averaging many trees captures non-linear patterns better than Linear Regression and is more stable than one tree.</p></details>
+      <details><summary>Explain MAE vs RMSE using your numbers.</summary><p>Holdout MAE 0.0042: average error is about 0.004 on a 0–1 score. RMSE 0.0093 is larger because it squares errors, so the few bigger misses (low-score products) count more.</p></details>
+      <details><summary>Why evaluate on the holdout only once?</summary><p>If we kept checking the holdout and adjusting the model, we would be tuning on it, and its score would no longer be an honest estimate of performance on unseen products.</p></details>
+      <details><summary>Why is the model only a tie-breaker in ranking?</summary><p>It predicts a popularity/discount proxy, not whether a product meets the user's needs. Live data also differs (average ratings, missing original price). So explicit requirement checks set the main order.</p></details>
+      <details><summary>How does the 1–10 match score work?</summary><p>Each stated need is a weighted check scored 0–1 (type, model, budget, RAM, storage, GPU/CPU/battery for the use). Score = 1 + 9 × weighted share met, rounded. A laptop that clearly fails a key need is capped at 5.</p></details>
+      <details><summary>Walk us through what happens in recommend_products.</summary><p>Read JSON → parse requirements → decide category → build a short search query → search Amazon (with one retry) → process and rank → add badges → explain the top 3 → write summary → save to MySQL if available → return JSON. Errors return 400/404/502/503.</p></details>
+      <details><summary>Why return 503 for a block but 404 for no products?</summary><p>A block means we could not see Amazon, so we can't claim nothing exists; 503 tells the user to wait. 404 means Amazon answered and genuinely had no matching listings.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ TEAM VIVA -->
+<section class="part" id="viva-all">
+  <div class="wrap">
+    <h2>Team viva: questions anyone may get</h2>
+    <div class="viva-tools"><button type="button" id="open-all">Show all answers</button><button type="button" id="close-all">Hide all answers</button></div>
+    <div class="viva">
+      <details><summary>Explain your project in one minute.</summary><p>ElectronicsAI recommends electronics from a plain-English request. Offline, we cleaned and analysed a 5,010-product Kaggle dataset, engineered features from titles, and trained a Random Forest on a proxy score. Live, we scrape Amazon India, extract the same features, filter by category, model and budget, score each product out of 10 against the user's needs, use the model to break ties, and explain the top results with real specs and reviews.</p></details>
+      <details><summary>Is the real Amazon data passed through your trained model?</summary><p>Yes, every live product is scored by the Kaggle-trained model using the same feature code. But it is scoring, not evaluation: Amazon gives no correct answer to compare with, so the model's accuracy on live data is not measured. Its score only breaks ties.</p></details>
+      <details><summary>Your R² is 0.993. Isn't that suspicious?</summary><p>It is expected, not a sign of a great recommender. The target is a formula of rating, reviews and discount, and those are inputs, so the model reproduces its own formula. We used grouped splits so this isn't leakage of duplicate products.</p></details>
+      <details><summary>Which FCDS phase did each of you do?</summary><p>Ananya: 01 understanding and 02 preprocessing. Pawni: 03 EDA and 04 statistics. Ajitesh: 05 feature engineering. Vedansh: 06 model development and 07 evaluation. Each of us also built the website part that uses our phase.</p></details>
+      <details><summary>What would you improve with more time?</summary><p>Save live listings to build a current dataset and retrain; collect human relevance labels to measure Precision@5 and NDCG; use an official product API instead of scraping; read the original price live so the discount feature isn't imputed.</p></details>
+      <details><summary>What are the main limitations?</summary><p>Single-review ratings in training data, few laptops (28), sparse specs in titles, a proxy target, scraping that can be blocked, and rule-based text analysis that can misread some reviews.</p></details>
+      <details><summary>Where is data science used, and where are rules used?</summary><p>Data science: cleaning, EDA, statistics, feature engineering, model training and evaluation (notebooks), and the model score live. Rules: parsing requests, filters, the 1–10 match score and the explanations, because they must be transparent and follow the user's stated needs exactly.</p></details>
+      <details><summary>How did you test the system?</summary><p>46 automated tests with Flask's test client and mocked Amazon, Gemini and MySQL, covering parsing, chat follow-ups, filtering, ranking, insights and every error path. Separately, a few live searches on Amazon India.</p></details>
+      <details><summary>What ethical issues did you consider?</summary><p>Respecting Amazon's rules with low request volume and no bypassing of checks, keeping API keys out of code, collecting no personal data, being clear that scores are not guarantees, avoiding popularity bias in the main ranking, and never inventing reviews.</p></details>
+      <details><summary>What happens if Gemini or MySQL is unavailable?</summary><p>Gemini: the local rule-based parser is used. MySQL: saving is skipped and searching works normally.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ RUN -->
+<section class="part" id="run">
+  <div class="wrap">
+    <h2>Run it before the viva</h2>
+    <h4>Website</h4>
+<pre class="block">python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m backend.app            # then open http://127.0.0.1:5001</pre>
+    <h4>Automated tests (no internet needed)</h4>
+<pre class="block">python -m unittest discover -s tests -v</pre>
+    <h4>Notebooks, in order, from the “Data Science” folder</h4>
+<pre class="block">jupyter nbconvert --to notebook --execute --inplace 01_data_understanding.ipynb
+# then 02, 03, 04, 05, 06, 07 the same way</pre>
+    <div class="note"><p>Demo tip: search a few times well before the viva to confirm Amazon is responding, and avoid many rapid searches right before it. If Amazon blocks, the site says how many minutes to wait; searches you already made still work from the cache. Present in pipeline order: Ananya, Pawni, Ajitesh, Vedansh, then Pawni runs the live demo.</p></div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">ElectronicsAI · FCDS PBL · Line counts measured from the project files (non-blank, non-comment lines). Function names and figures match the current code and notebook outputs.</div></footer>
+
+<script>
+(function () {
+  function setAll(open) {
+    document.querySelectorAll('#viva-all details').forEach(function (d) { d.open = open; });
+  }
+  var o = document.getElementById('open-all');
+  var c = document.getElementById('close-all');
+  if (o) o.addEventListener('click', function () { setAll(true); });
+  if (c) c.addEventListener('click', function () { setAll(false); });
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>if (window.mermaid) { mermaid.initialize({ startOnLoad: true }); }</script>
+</body>
+</html>

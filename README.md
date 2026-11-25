@@ -68,11 +68,23 @@ Each result shows a match score out of 10 (`backend/recommendation_engine.py`, `
 
 ## Uses instead of specs
 
-A laptop request can describe what it is for instead of listing hardware, for example "laptop for smooth video editing and 3D modelling". `backend/use_cases.py` finds every use in the request (3D modelling, video editing, gaming, design, coding, student, business) and turns them into stated rules of thumb for GPU level, CPU level, RAM and storage, keeping the strictest need when several uses are named. These needs are used to
+A laptop request can describe what it is for instead of listing hardware, for example "laptop for smooth video editing and 3D modelling". `backend/use_cases.py` finds every use in the request (3D modelling, video editing, gaming, design, coding, student/studying, business, and long battery life such as "good battery" or "don't want to keep charging it") and turns them into stated rules of thumb for GPU level, CPU level, RAM and storage, keeping the strictest need when several uses are named. These needs are used to
 
 - search Amazon for suitable hardware (e.g. "laptop rtx 4060 16gb ram"; such hint words never act as an exact-model filter),
 - add GPU/CPU/RAM/storage checks to the 1–10 match score, read from the listing title,
 - cap a laptop that clearly fails a key need (e.g. integrated graphics for 3D work) at 5/10.
 
 The levels are simple title-based rules of thumb, not benchmarks.
+
+## Why it fits you, things to know, and customer comments
+
+For the top 3 results the app reads the Amazon product page once (`get_product_page_info` in the scraper, cached for 15 minutes) to get real customer reviews with their star ratings and the product's spec table. `backend/product_insights.py` then fills the three boxes on the product page:
+
+- **Why it fits you**: spec facts explained against the user's needs, such as what the graphics card means for gaming, 3D or video work, whether the RAM meets the use (and how far it can be upgraded), refresh rate for gaming, budget headroom, the rating, and which aspects reviewers praise.
+- **Things to know**: practical cautions for that product and need, such as short battery life under load for laptops with a dedicated graphics card, heat and fan noise, weight, limited graphics memory, RAM or storage below the need, macOS gaming limits, few ratings, and which aspects reviewers complain about.
+- **Customer comments**: real review text with the reviewer's stars.
+
+Review themes are counted from real reviews with simple keyword rules ("3 of 8 reviews"); nothing is generated or invented. Statements about hardware types (for example battery life under gaming load) are worded as typical behaviour. Results 4–6 are explained from the listing title only, and say so.
+
+Battery life is judged from the listed hours when Amazon gives them (maker figures for light use), otherwise from the chips: Apple and Snapdragon chips and U-series processors score well, while gaming graphics cards and H/HX processors score low. A request is never sent to Amazon as a long sentence: only product words and the use-case hint are searched, and an empty result is retried once with a shorter query.
 

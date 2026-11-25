@@ -16,7 +16,8 @@ from backend.claude_ai import (
     parse_user_requirements,
     _remove_budget_words,
 )
-from backend.product_aggregator import search_products, get_reviews
+from backend.product_aggregator import search_products, get_product_page
+from backend.product_insights import review_snippets, things_to_know, why_it_fits
 from backend.scrapers.amazon_scraper import AmazonBlockedError, minutes_until_retry
 from backend.data_processor import process_products, products_to_dict_list
 from backend.recommendation_engine import recommend, get_match_label
@@ -30,25 +31,26 @@ app = Flask(__name__, static_folder="../frontend")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 
-# Review pages cost one Amazon request each, so only the top few results get
-# them, one after another (not all at once), to avoid being blocked.
+# A product page costs one Amazon request, so only the top few results get
+# real reviews and the full spec table, fetched one after another.
 REVIEWS_FOR_TOP = 3
 
 
-def _enrich_products_with_reviews(products: list) -> list:
-    """Attach real review snippets to the top results."""
+def _enrich_products_with_reviews(products: list, requirements: dict) -> list:
+    """Fill the "Why it fits you", "Things to know" and "Customer comments" boxes."""
     for position, product in enumerate(products):
         asin = product.get("asin")
-        reviews = []
-        if asin and position < REVIEWS_FOR_TOP:
+        page = {}
+        checked = bool(asin) and position < REVIEWS_FOR_TOP
+        if checked:
             try:
-                reviews = get_reviews(asin=asin, product_url=product.get("product_url"))
+                page = get_product_page(asin=asin) or {}
             except Exception as exc:
-                print(f"[Review Scraper] Failed for {asin}: {exc}")
-        product["reviews"] = reviews
-        # Show source review snippets directly; no generated claims.
-        product.setdefault("pros", [])
-        product.setdefault("cons", [])
+                print(f"[Product Page] Failed for {asin}: {exc}")
+        reviews = page.get("reviews") or []
+        product["reviews"] = review_snippets(reviews)
+        product["pros"] = why_it_fits(product, requirements, page)
+        product["cons"] = things_to_know(product, requirements, page, reviews_checked=checked)
         product["sentiment"] = "available_for_review" if reviews else "unavailable"
     return products
 
@@ -79,6 +81,37 @@ def _laptop_query_for_use_cases(category: str, text: str) -> str:
         return text
     kept = [w for w in key_words(text) if w not in USE_CASE_WORDS and w not in {"laptop", "laptops", "notebook"}]
     return " ".join(["laptop"] + kept + [laptop_search_hint(use_cases)]).strip()
+
+
+def _simpler_query(category: str, query: str) -> str:
+    """A short fallback search: the product words only, e.g. "laptop" or "sony ps5"."""
+    if category == "laptop":
+        return f"laptop {laptop_search_hint(detect_use_cases(query))}".strip()
+    words = [w for w in product_words(query) if w not in USE_CASE_WORDS][:4]
+    return " ".join(words) or category
+
+
+def _search_store(query: str, category: str, requirements: dict) -> list:
+    """Search Amazon; if nothing comes back, try once more with a shorter query.
+
+    Long sentences sometimes return no results on Amazon even when suitable
+    products exist, so one simpler search is worth the extra request.
+    """
+    settings = dict(
+        category=category,
+        budget_min=requirements.get("budget_min"),
+        budget_max=requirements.get("budget_max"),
+        page=1,
+        # Filter by exact model only when the user named one, not when
+        # the app added a model as a search hint for a use case.
+        exact_models=bool(requirements.get("required_models")),
+    )
+    products = search_products(query=query, **settings)
+    simpler = _simpler_query(category, query)
+    if not products and simpler and simpler.lower() != query.lower():
+        print(f"[Amazon] No results for '{query}'; trying '{simpler}'")
+        products = search_products(query=simpler, **settings)
+    return products
 
 
 def _classify_refinement_context(user_query: str, original_req: dict, new_req: dict) -> str:
@@ -208,16 +241,7 @@ def recommend_products():
     search_query = _laptop_query_for_use_cases(category, search_query)
 
     try:
-        raw_products = search_products(
-            query=search_query,
-            category=category,
-            budget_min=requirements.get("budget_min"),
-            budget_max=requirements.get("budget_max"),
-            page=1,
-            # Filter by exact model only when the user named one, not when
-            # the app added a model as a search hint for a use case.
-            exact_models=bool(requirements.get("required_models")),
-        )
+        raw_products = _search_store(search_query, category, requirements)
         print(f"[Amazon] Fetched {len(raw_products)} products")
     except Exception as e:
         print(f"[Amazon] Error: {e}")
@@ -237,11 +261,8 @@ def recommend_products():
     # Step 5: Add review snippets for all visible results.
     products_list = products_to_dict_list(ranked_df)
     for product in products_list:
-        exact_match = bool(requirements.get("required_models"))
         product["match_label"] = get_match_label(product.get("fit_score", 1))
-        if exact_match:
-            product["pros"] = [f"Matches the {requirements['required_models'][0].upper()} model you asked for."]
-    products_list = _enrich_products_with_reviews(products_list)
+    products_list = _enrich_products_with_reviews(products_list, requirements)
 
 
     # Step 6: Give a fast, factual summary based on the ranked results.
@@ -469,14 +490,7 @@ def refine_search():
     store_query = _laptop_query_for_use_cases(category, store_query)
 
     try:
-        raw_products = search_products(
-            query=store_query,
-            category=category,
-            budget_min=merged.get("budget_min"),
-            budget_max=merged.get("budget_max"),
-            page=1,
-            exact_models=bool(merged.get("required_models")),
-        )
+        raw_products = _search_store(store_query, category, merged)
     except Exception as e:
         print(f"[Amazon] Refine error: {e}")
         return _store_error_response(e)
@@ -488,11 +502,8 @@ def refine_search():
 
     # STEP 8: LABELS
     for product in products_list:
-        exact_match = bool(merged.get("required_models"))
         product["match_label"] = get_match_label(product.get("fit_score", 1))
-        if exact_match:
-            product["pros"] = [f"Matches the {merged['required_models'][0].upper()} model you asked for."]
-    products_list = _enrich_products_with_reviews(products_list)
+    products_list = _enrich_products_with_reviews(products_list, merged)
 
     # ─── STEP 9: SUMMARY ───
     try:

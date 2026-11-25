@@ -61,6 +61,7 @@ CATALOGUE = [
     make_product("XBG1", "Forza Horizon 5 Standard Edition (Xbox Series X|S Game)", 2999),
     make_product("FOLD1", "Samsung Galaxy Z Fold7 5G (Blue Shadow, 12GB RAM, 256GB Storage)", 174999),
     make_product("RTX5090L", "ASUS ROG Strix SCAR 18, Intel Core Ultra 9 275HX, RTX 5090 24GB, 64GB RAM, 2TB SSD, Gaming Laptop", 449990),
+    make_product("LAPBAT1", "ASUS Vivobook 14, Intel Core i5-1335U, 16GB RAM, 512GB SSD, Up to 10 Hours Battery, Thin and Light Laptop", 72990),
     make_product("BAG1", "Laptop Backpack for 15.6 inch Laptops, Water Resistant", 999),
     make_product("STAND1", "Adjustable Laptop Stand for Desk, Aluminium", 799),
 ]
@@ -92,7 +93,7 @@ class WebsitePipelineTests(unittest.TestCase):
         self.store = FakeStore()
         self.patches = [
             mock.patch.object(app_module, "search_products", side_effect=self.store.search),
-            mock.patch.object(app_module, "get_reviews", return_value=[]),
+            mock.patch.object(app_module, "get_product_page", return_value={"reviews": [], "specs": {}}),
             mock.patch.object(app_module, "save_query", return_value=0),
             mock.patch.object(app_module, "save_recommendations", return_value=None),
             mock.patch.object(app_module, "upsert_product", return_value=None),
@@ -306,6 +307,32 @@ class WebsitePipelineTests(unittest.TestCase):
         self.assertGreater(cpu_level("Intel Core i7-13650HX"), cpu_level("Intel Core i5-1235U"))
         self.assertLess(cpu_level("Intel Celeron N4500"), 0.2)
 
+    # ---- studying + long battery ------------------------------------------
+    def test_study_laptop_with_good_battery(self):
+        query = "i need a laptop for studying and a good battery life so that i dont have to keep it charging everytime"
+        status, data = self.recommend(query)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["requirements"]["use_cases"], ["student", "long battery"])
+        self.assertEqual(self.store.queries[0], "laptop long battery life")   # not the whole sentence
+        scores = {p["asin"]: p["fit_score"] for p in data["products"]}
+        self.assertIn(self.asins(data)[0], {"LAPBAT1", "MACM5A", "MACM4A"})
+        for gaming_laptop in ("LAP4060A", "LAP4060B", "LAP4050A", "RTX5090L"):
+            if gaming_laptop in scores:
+                self.assertLessEqual(scores[gaming_laptop], 5)
+
+    def test_empty_search_is_retried_once_with_a_shorter_query(self):
+        calls = []
+
+        def picky_store(query, **settings):
+            calls.append(query)
+            return [] if len(calls) == 1 else self.store.search(query, **settings)
+
+        with mock.patch.object(app_module, "search_products", side_effect=picky_store):
+            status, data = self.recommend("samsung galaxy fold something unusual words here")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1], "samsung galaxy fold unusual")
+
     # ---- ranking -------------------------------------------------------
     def test_exact_model_matches_rank_above_other_laptops(self):
         # Without a model filter the GPU laptops are all visible, but a
@@ -462,13 +489,113 @@ class PoliteClientAppTests(unittest.TestCase):
         self.assertIn("wait about 7 minute", response.get_json()["error"])
 
     def test_reviews_are_fetched_only_for_top_results(self):
-        products = [{"asin": f"A{i}", "product_url": ""} for i in range(6)]
-        with mock.patch.object(app_module, "get_reviews", return_value=["Good"]) as fake_reviews:
-            app_module._enrich_products_with_reviews(products)
-        self.assertEqual(fake_reviews.call_count, app_module.REVIEWS_FOR_TOP)
+        products = [{"asin": f"A{i}", "product_url": "", "product_title": "HP Laptop"} for i in range(6)]
+        page = {"reviews": [{"stars": 5.0, "text": "Good"}], "specs": {}}
+        with mock.patch.object(app_module, "get_product_page", return_value=page) as fake_page:
+            app_module._enrich_products_with_reviews(products, {"category": "laptop"})
+        self.assertEqual(fake_page.call_count, app_module.REVIEWS_FOR_TOP)
         self.assertEqual(products[0]["sentiment"], "available_for_review")
+        self.assertEqual(products[0]["reviews"], ["5/5 stars: Good"])
         self.assertEqual(products[5]["sentiment"], "unavailable")
+        self.assertTrue(any("top 3 results only" in line for line in products[5]["cons"]))
 
+
+# Spec values copied from a live Amazon India product page (Lenovo LOQ, Nov 2026).
+# Review texts are written in the style of real ones and used only in tests.
+LOQ_PAGE = {
+    "specs": {
+        "Graphics Co Processor": "NVIDIA GeForce RTX 4050", "Graphics RAM Size": "6 GB",
+        "CPU Model Number": "Core i7-13650HX", "RAM Size": "16 GB", "Ram Memory Maximum Size": "32 GB",
+        "Hard Drive Size": "512 GB", "Item Weight": "2.38 Kilograms", "Battery Life": "5 Hours",
+        "Lithium Battery Energy Content": "60 Watt Hours", "Display Refresh Rate in Hertz": "144",
+        "Maximum Display Brightness": "300 Nit",
+    },
+    "reviews": [
+        {"stars": 5.0, "text": "Best laptop to buy. All rounder laptop. Pros: performance, display, rgb keyboard. Cons: battery"},
+        {"stars": 1.0, "text": "After opening neither charger nor laptop switched on. Damaged product delivered."},
+        {"stars": 4.0, "text": "Smooth gaming performance but it heats up a lot while gaming."},
+    ],
+}
+LOQ = {
+    "asin": "B0HF7V9646", "product_price": 94990.0, "product_star_rating": 3.0, "product_num_ratings": 4,
+    "product_category": "Laptops",
+    "product_title": "Lenovo LOQ Intel Core i7-13650HX | NVIDIA RTX 4050 6GB (16GB RAM/512GB SSD/144Hz) Gaming Laptop",
+}
+
+
+class ProductInsightTests(unittest.TestCase):
+    def setUp(self):
+        from backend import product_insights
+        self.insights = product_insights
+        self.requirements = {
+            "category": "laptop", "budget_max": 100000, "search_query": "gaming laptop under 100000",
+            "use_cases": ["gaming"],
+        }
+
+    def test_why_it_fits_explains_hardware_for_the_use(self):
+        lines = " ".join(self.insights.why_it_fits(LOQ, self.requirements, LOQ_PAGE))
+        self.assertIn("RTX 4050 with 6 GB of graphics memory", lines)
+        self.assertIn("games", lines)
+        self.assertIn("Core i7-13650HX", lines)
+        self.assertIn("upgraded to 32 GB", lines)
+        self.assertIn("144 Hz screen", lines)
+        self.assertIn("₹5,010 to spare", lines)
+        self.assertIn("Reviewers praise: performance (2 of 3)", lines)
+
+    def test_things_to_know_covers_battery_weight_and_complaints(self):
+        lines = " ".join(self.insights.things_to_know(LOQ, self.requirements, LOQ_PAGE))
+        self.assertIn("Amazon lists 5 hours, 60 Wh battery", lines)
+        self.assertIn("keep it plugged in", lines)
+        self.assertIn("fans get loud", lines)
+        self.assertIn("2.38 kg", lines)
+        self.assertIn("512 GB storage", lines)
+        self.assertIn("Only 4 ratings", lines)
+        self.assertIn("battery life (1 of 3)", lines)
+        self.assertIn("heat levels (1 of 3)", lines)
+        self.assertIn("delivery or condition (1 of 3)", lines)
+
+    def test_needs_change_the_advice(self):
+        three_d = {**self.requirements, "use_cases": ["3d modelling"], "search_query": "laptop for 3d modelling"}
+        lines = " ".join(self.insights.things_to_know(LOQ, three_d, LOQ_PAGE))
+        self.assertIn("complex scenes run better with 32 GB", lines)
+        self.assertNotIn("144 Hz", " ".join(self.insights.why_it_fits(LOQ, three_d, LOQ_PAGE)))
+
+    def test_no_dedicated_gpu_is_flagged_for_video_editing(self):
+        basic = {"product_title": "HP 15s Ryzen 5 5500U 8GB RAM 512GB SSD Laptop", "product_price": 38990.0,
+                 "product_star_rating": None, "product_num_ratings": None, "product_category": "Laptops"}
+        needs = {"category": "laptop", "search_query": "laptop for video editing", "use_cases": ["video editing"]}
+        lines = " ".join(self.insights.things_to_know(basic, needs, {}))
+        self.assertIn("No dedicated graphics card", lines)
+        self.assertIn("8 GB RAM is below the 16 GB", lines)
+        self.assertIn("No Amazon rating", lines)
+        self.assertNotIn("plugged in", lines)
+
+    def test_battery_advice_for_students(self):
+        needs = {"category": "laptop", "search_query": "laptop for studying with good battery",
+                 "use_cases": ["student", "long battery"]}
+        light = {"product_title": "ASUS Vivobook 14, Intel Core i5-1335U, 16GB RAM, 512GB SSD Laptop",
+                 "product_price": 55990.0, "product_star_rating": 4.2, "product_num_ratings": 300, "product_category": "Laptops"}
+        page = {"specs": {"Battery Life": "10 Hours", "Item Weight": "1.4 Kilograms", "CPU Model Number": "Core i5-1335U"}, "reviews": []}
+        fits = " ".join(self.insights.why_it_fits(light, needs, page))
+        self.assertIn("10 hours of battery life", fits)
+        self.assertIn("power-efficient", fits)
+        self.assertIn("1.4 kg", fits)
+        know = " ".join(self.insights.things_to_know(LOQ, needs, LOQ_PAGE))
+        self.assertIn("Not a good pick if you want to avoid charging often", know)
+        self.assertIn("only 5 hours", know)
+
+    def test_text_from_amazon_is_html_escaped(self):
+        page = {"specs": {"Graphics Co Processor": "RTX 4060 <script>x</script>"}, "reviews": []}
+        lines = " ".join(self.insights.why_it_fits(LOQ, self.requirements, page))
+        self.assertNotIn("<script>", lines)
+
+    def test_review_parser_reads_stars_and_removes_boilerplate(self):
+        from bs4 import BeautifulSoup
+        from backend.scrapers import amazon_scraper
+        html = """<div data-hook="review"><i data-hook="review-star-rating"><span>4.0 out of 5 stars</span></i>
+        <span data-hook="reviewText">Brief content visible, double tap to read full content. Great screen.</span></div>"""
+        reviews = amazon_scraper._read_review_blocks(BeautifulSoup(html, "lxml"))
+        self.assertEqual(reviews, [{"stars": 4.0, "text": "Great screen."}])
 
 if __name__ == "__main__":
     unittest.main()

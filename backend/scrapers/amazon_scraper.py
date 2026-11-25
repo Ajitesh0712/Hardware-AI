@@ -360,6 +360,83 @@ def get_product_reviews(asin=None, product_url=None):
         print(f"[Review Scraper] Could not retrieve reviews for {asin}: {exc}")
         return []
     
+_page_cache = {}  # asin -> (saved_at, info)
+
+_REVIEW_BOILERPLATE = (
+    "Brief content visible, double tap to read full content.",
+    "Full content visible, double tap to read brief content.",
+    "Read moreRead less", "Read more Read less", "Read more", "Read less",
+)
+
+
+def _clean_review_text(text):
+    for phrase in _REVIEW_BOILERPLATE:
+        text = text.replace(phrase, " ")
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _read_review_blocks(soup, limit=8):
+    """Real reviews on the page as {"stars": 1-5 or None, "text": "..."}."""
+    reviews = []
+    for block in soup.select('[data-hook="review"]'):
+        body = block.select_one('[data-hook="reviewText"], [data-hook="review-body"], [data-hook="review-collapsed"]')
+        text = _clean_review_text(body.get_text(" ", strip=True)) if body else ""
+        if not text:
+            continue
+        star_el = block.select_one('[data-hook="review-star-rating"], [data-hook="cmps-review-star-rating"], i.review-rating')
+        star_match = re.search(r"(\d(?:\.\d)?)\s*out of 5", star_el.get_text(" ", strip=True)) if star_el else None
+        reviews.append({"stars": float(star_match.group(1)) if star_match else None, "text": text[:600]})
+        if len(reviews) >= limit:
+            break
+    return reviews
+
+
+def _read_spec_table(soup):
+    """Spec rows such as {"Graphics Co Processor": "NVIDIA GeForce RTX 4050"}."""
+    specs = {}
+    rows = soup.select(".prodDetTable tr, #productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr")
+    for row in rows:
+        cells = row.find_all(["th", "td"])
+        if len(cells) >= 2:
+            key = cells[0].get_text(" ", strip=True)
+            value = re.sub(r"\s+", " ", cells[1].get_text(" ", strip=True)).replace("\u200e", "").strip()
+            if key and value and key not in specs:
+                specs[key] = value
+    return specs
+
+
+def get_product_page_info(asin):
+    """Read one product page: real reviews and the spec table.
+
+    This is one Amazon request, so results are cached and the request is
+    skipped while the app is paused after a block. Returns empty lists/dicts
+    when nothing could be read; nothing is ever made up.
+    """
+    global _reviews_paused_until
+    empty = {"reviews": [], "specs": {}}
+    if not asin:
+        return empty
+    saved = _page_cache.get(asin)
+    if saved and time.time() - saved[0] < CACHE_SECONDS:
+        return saved[1]
+    if time.time() < _reviews_paused_until or minutes_until_retry():
+        return empty
+    try:
+        response = requests.get(f"https://www.amazon.in/dp/{asin}", headers=HEADERS, timeout=8)
+        response.raise_for_status()
+        if _looks_blocked(response.text) or "/ap/signin" in response.url:
+            _reviews_paused_until = time.time() + PAUSE_SECONDS
+            print("[Product Page] Robot check or sign-in page; pausing product page requests")
+            return empty
+        soup = BeautifulSoup(response.text, "lxml")
+        info = {"reviews": _read_review_blocks(soup), "specs": _read_spec_table(soup)}
+        _page_cache[asin] = (time.time(), info)
+        return info
+    except Exception as exc:
+        print(f"[Product Page] Could not read {asin}: {exc}")
+        return empty
+
+
 def extract_details(soup):
     details={
         "rating":0.0,

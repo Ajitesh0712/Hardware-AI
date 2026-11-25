@@ -27,6 +27,9 @@ FILLER_WORDS = BUDGET_WORDS | {
     "suitable", "smooth", "smoothly", "handle", "handles", "which", "will", "should", "able",
     "use", "using", "usage", "purpose", "task", "tasks", "stuff", "things", "run", "running",
     "heavy", "works", "working", "do", "doing", "be", "its", "all", "well", "lot",
+    "so", "dont", "don", "doesn", "isn", "won", "t", "have", "has", "keep", "keeps", "every",
+    "everytime", "time", "times", "always", "again", "much", "really", "very", "not", "going",
+    "go", "kind", "sort", "im", "ive", "then", "there", "when", "while", "if", "would", "could",
 }
 
 # Words that change *how* to pick, not *what* product is wanted.
