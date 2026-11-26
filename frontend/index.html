@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HardwareAI | Ultimate Command Center</title>
+    <title>ElectronicsAI | Ultimate Command Center</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -60,7 +60,8 @@
         }
 
         h1 {
-            font-size: 4.5rem;
+            /* 4.5rem on laptops/tablets; shrinks on phones so "ElectronicsAI" fits */
+            font-size: clamp(2.5rem, 14vw, 4.5rem);
             font-weight: 800;
             letter-spacing: -0.05em;
             background: linear-gradient(to bottom, #ffffff, #64748b);
@@ -339,7 +340,7 @@
 <div id="landing-view" class="hero-gradient hide-scrollbar">
     <div style="text-align: center; margin-bottom: 3rem;">
         <div class="badge">Simple electronics help</div>
-        <h1>Hardware<span>AI</span></h1>
+        <h1>Electronics<span>AI</span></h1>
         <p style="color: var(--text-gray); font-size: 1.1rem; max-width: 500px; margin: 0 auto;">
             Tell us what you need. We’ll find options that fit your budget and how you plan to use them.
         </p>

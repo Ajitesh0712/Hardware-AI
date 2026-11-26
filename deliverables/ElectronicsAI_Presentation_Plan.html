@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ElectronicsAI Presentation Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (max 980px) with a sticky section bar; each module carries its owner's colour */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --fg: #172033;
+  --muted: #55627a;
+  --line: #d8dee8;
+  --accent: #0f6f78;
+  --code-bg: #eef2f7;
+  --mod-a: #0f7a6c;  --mod-a-soft: #e2f3f0;
+  --mod-b: #6a4fc2;  --mod-b-soft: #ece8fa;
+  --mod-c: #b4630a;  --mod-c-soft: #fbefdf;
+  --mod-d: #b83a5e;  --mod-d-soft: #f9e6ec;
+  --ok: #1d7a3a;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161f; --surface: #182030; --fg: #e5eaf2; --muted: #9aa6ba; --line: #2b3548;
+    --accent: #4fc1c9; --code-bg: #1f293b;
+    --mod-a: #4cc9b5; --mod-a-soft: #15302d; --mod-b: #a995f2; --mod-b-soft: #262040;
+    --mod-c: #f0a24a; --mod-c-soft: #33261a; --mod-d: #f07c9c; --mod-d-soft: #36202a;
+    --ok: #5fcf83; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161f; --surface: #182030; --fg: #e5eaf2; --muted: #9aa6ba; --line: #2b3548;
+  --accent: #4fc1c9; --code-bg: #1f293b;
+  --mod-a: #4cc9b5; --mod-a-soft: #15302d; --mod-b: #a995f2; --mod-b-soft: #262040;
+  --mod-c: #f0a24a; --mod-c-soft: #33261a; --mod-d: #f07c9c; --mod-d-soft: #36202a;
+  --ok: #5fcf83; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15.5px; line-height: 1.6; }
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.6rem; }
+h3 { font-size: 1.22rem; font-weight: 600; margin: 1.8rem 0 0.6rem; }
+h4 { font-size: 1.02rem; font-weight: 600; margin: 1.2rem 0 0.4rem; }
+p { margin: 0 0 0.9rem; max-width: 70ch; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+pre.block { font-family: var(--font-mono); font-size: 0.83rem; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 0.9rem 1rem; overflow-x: auto; line-height: 1.5; margin: 0 0 1rem; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* header */
+header.top { padding-block: 2.6rem 1.6rem; border-bottom: 1px solid var(--line); background: var(--surface); }
+header.top .lead { font-size: 1.08rem; color: var(--muted); margin-top: 0.8rem; max-width: 66ch; }
+
+/* sticky nav */
+nav.sections { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+nav.sections .wrap { display: flex; gap: 0.35rem; overflow-x: auto; padding-block: 0.55rem; scrollbar-width: thin; }
+nav.sections a { white-space: nowrap; text-decoration: none; color: var(--fg); font-size: 0.86rem; font-weight: 500; padding: 0.3rem 0.65rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+nav.sections a:hover, nav.sections a:focus-visible { border-color: var(--accent); outline: none; }
+nav.sections a .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+
+section.part { padding-block: 2.6rem 1rem; border-bottom: 1px solid var(--line); }
+
+/* team cards */
+.team { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.8rem; margin: 1.2rem 0 1rem; }
+.member { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 10px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.member .who { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
+.member .mod { font-size: 0.88rem; color: var(--muted); }
+.member .loc { font-family: var(--font-mono); font-size: 1.35rem; font-weight: 600; color: var(--c); font-variant-numeric: tabular-nums; margin-top: 0.3rem; }
+.member .loc small { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
+
+/* LOC bars */
+.bars { display: grid; gap: 0.5rem; margin: 0.8rem 0 1.4rem; }
+.bar-row { display: grid; grid-template-columns: 9.5rem 1fr 4.2rem; gap: 0.6rem; align-items: center; font-size: 0.86rem; }
+.bar-track { height: 18px; background: var(--code-bg); border-radius: 4px; overflow: hidden; display: flex; }
+.bar-track span { display: block; height: 100%; }
+.bar-row .n { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 0.5rem 0 1.2rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-display); font-weight: 600; font-size: 0.82rem; background: var(--code-bg); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td.fn { font-family: var(--font-mono); font-size: 0.82rem; white-space: nowrap; }
+td.fn .where { display: block; color: var(--muted); font-size: 0.75rem; }
+td.num { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.unused { font-size: 0.72rem; font-family: var(--font-mono); color: var(--muted); border: 1px dashed var(--line); border-radius: 4px; padding: 0 0.3rem; margin-left: 0.3rem; white-space: nowrap; }
+
+/* module headers */
+.module-head { border-left: 6px solid var(--c); padding: 0.2rem 0 0.2rem 1rem; margin-bottom: 1.2rem; }
+.module-head .owner { font-size: 1rem; color: var(--muted); margin-top: 0.3rem; }
+.module-head .owner b { color: var(--c); }
+.files { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 1rem; }
+.files span { font-family: var(--font-mono); font-size: 0.78rem; background: var(--soft); color: var(--fg); border-radius: 5px; padding: 0.2rem 0.5rem; }
+
+/* step list */
+ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 0.8rem 0 1.2rem; display: grid; gap: 0.6rem; }
+ol.steps > li { counter-increment: step; display: grid; grid-template-columns: 2.1rem 1fr; gap: 0.7rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 0.9rem; }
+ol.steps > li::before { content: counter(step); font-family: var(--font-mono); font-weight: 600; width: 2.1rem; height: 2.1rem; border-radius: 50%; display: grid; place-items: center; background: var(--soft, var(--code-bg)); color: var(--c, var(--accent)); }
+ol.steps > li > div { min-width: 0; }
+ol.steps .tag { font-family: var(--font-mono); font-size: 0.72rem; border-radius: 4px; padding: 0.05rem 0.4rem; margin-left: 0.35rem; color: var(--surface); white-space: nowrap; }
+.tA { background: var(--mod-a); } .tB { background: var(--mod-b); } .tC { background: var(--mod-c); } .tD { background: var(--mod-d); }
+ol.steps .out { display: block; margin-top: 0.35rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* glossary */
+dl.gloss { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.7rem; margin: 0.8rem 0 1rem; }
+dl.gloss div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.85rem; min-width: 0; }
+dl.gloss dt { font-family: var(--font-display); font-weight: 600; margin-bottom: 0.2rem; }
+dl.gloss dd { margin: 0; font-size: 0.88rem; color: var(--muted); }
+
+/* callouts */
+.note { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; padding: 0.7rem 0.9rem; margin: 0.8rem 0 1.1rem; font-size: 0.92rem; }
+.note p { margin: 0; }
+
+/* viva */
+.viva { display: grid; gap: 0.5rem; margin: 0.6rem 0 1.4rem; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.9rem; }
+details summary { cursor: pointer; font-weight: 600; list-style-position: outside; }
+details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+details[open] summary { margin-bottom: 0.4rem; }
+details p { font-size: 0.92rem; color: var(--fg); margin-bottom: 0.4rem; }
+.viva-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.4rem 0; }
+.viva-tools button { font: inherit; font-size: 0.82rem; padding: 0.3rem 0.7rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.viva-tools button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mermaid-box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.8rem; overflow-x: auto; margin: 0.6rem 0 1.2rem; }
+pre.mermaid { margin: 0; background: transparent; }
+
+footer { padding-block: 2rem 3rem; color: var(--muted); font-size: 0.85rem; }
+@media (max-width: 560px) {
+  .bar-row { grid-template-columns: 6.5rem 1fr 3.4rem; font-size: 0.8rem; }
+  ol.steps > li { grid-template-columns: 1fr; }
+  h2 { font-size: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; scroll-padding-top: 4rem; }
+</style>
+<style>body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">FCDS Project Based Learning · Final demo and viva</div>
+    <h1>ElectronicsAI Presentation Plan</h1>
+    <p class="lead">How to present the project so the examiner sees a data science project first and a website second: who speaks when, what to show on screen, what to say with real numbers, how to run the demo, and what to do if something fails.</p>
+  </div>
+</header>
+
+<nav class="sections" aria-label="Sections">
+  <div class="wrap">
+    <a href="#approach">The approach</a>
+    <a href="#running-order">Running order</a>
+    <a href="#emphasis">What to stress</a>
+    <a href="#ananya"><span class="dot" style="background:var(--mod-a)"></span>Ananya</a>
+    <a href="#pawni"><span class="dot" style="background:var(--mod-b)"></span>Pawni</a>
+    <a href="#ajitesh"><span class="dot" style="background:var(--mod-c)"></span>Ajitesh</a>
+    <a href="#vedansh"><span class="dot" style="background:var(--mod-d)"></span>Vedansh</a>
+    <a href="#demo">Live demo</a>
+    <a href="#slides">Slides</a>
+    <a href="#phrases">Words to use</a>
+    <a href="#checklist">Checklist</a>
+  </div>
+</nav>
+
+<main>
+<!-- ============================================================ APPROACH -->
+<section class="part" id="approach">
+  <div class="wrap">
+    <h2>The approach</h2>
+    <p>The course is Fundamentals of Computing for Data Science, so the examiner is grading the data work: how you understood, cleaned, explored, tested, engineered and modelled the data. The website matters because it proves the model is actually used, but it should not take over the talk.</p>
+    <div class="team">
+      <div class="member" style="--c:var(--accent)"><span class="eyebrow">Rule 1</span><span class="who">70% data science</span><span class="mod">About 10 of 14 minutes go to the seven notebooks, their numbers and plots. The website gets the rest.</span></div>
+      <div class="member" style="--c:var(--accent)"><span class="eyebrow">Rule 2</span><span class="who">Notebooks first</span><span class="mod">Present in pipeline order, 01 → 07, then show the website as the place where that pipeline's output is used.</span></div>
+      <div class="member" style="--c:var(--accent)"><span class="eyebrow">Rule 3</span><span class="who">Numbers, not adjectives</span><span class="mod">Say “270 missing prices, median ₹649, p = 0.491, holdout R² 0.993”, never “the data was messy” or “the model is very accurate”.</span></div>
+      <div class="member" style="--c:var(--accent)"><span class="eyebrow">Rule 4</span><span class="who">Name the limits yourself</span><span class="mod">Say the proxy target and the high R² caveat before the examiner asks. It shows you understand your own results.</span></div>
+    </div>
+    <div class="note"><p><b>The one-line story to repeat:</b> “We built a data science pipeline on 5,010 Amazon products, and our website uses the same feature code and the trained model to rank live Amazon listings for a user's request.”</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ RUNNING ORDER -->
+<section class="part" id="running-order">
+  <div class="wrap">
+    <h2>Running order (about 14 minutes)</h2>
+    <p>Times are a guide; if you get only 10 minutes, shorten the demo first and keep the notebook parts. Each speaker hands over with one sentence, so the talk sounds like one pipeline.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Time</th><th>Speaker</th><th>Part</th><th>On screen</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0:00–1:00</td><td><b>Ananya</b></td><td>Problem and the two pipelines</td><td>Slide: problem + two-pipeline diagram</td></tr>
+        <tr><td class="num">1:00–3:30</td><td><b>Ananya</b></td><td>Phase 1 Understanding, Phase 2 Preprocessing</td><td>Notebooks 01 and 02 (missing-value table, cleaning functions)</td></tr>
+        <tr><td class="num">3:30–6:00</td><td><b>Pawni</b></td><td>Phase 3 EDA, Phase 4 Statistics</td><td>EDA plots, Mann–Whitney output</td></tr>
+        <tr><td class="num">6:00–8:00</td><td><b>Ajitesh</b></td><td>Phase 5 Feature engineering + live feature cell</td><td>Notebook 05 checks table, one live notebook cell</td></tr>
+        <tr><td class="num">8:00–10:30</td><td><b>Vedansh</b></td><td>Phase 6 Model, Phase 7 Evaluation</td><td>Model comparison chart, holdout table, residual plot</td></tr>
+        <tr><td class="num">10:30–13:00</td><td><b>Pawni</b> drives, each owner narrates</td><td>Live demo, framed as “the pipeline in use”</td><td>Website: two searches</td></tr>
+        <tr><td class="num">13:00–14:00</td><td><b>Vedansh</b></td><td>Limitations, ethics, what we'd do next</td><td>Slide: limitations</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============================================================ EMPHASIS -->
+<section class="part" id="emphasis">
+  <div class="wrap">
+    <h2>What to stress and what to keep short</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Stress (FCDS)</th><th>Mention in one line</th><th>Skip unless asked</th></tr></thead>
+      <tbody>
+        <tr><td>Data-quality findings (missing values, review_rating is one review's stars, “FREE Delivery” text in counts)</td><td>Amazon scraper collects live listings</td><td>HTML/CSS styling, loading animation</td></tr>
+        <tr><td>Cleaning decisions and why rows were not deleted</td><td>Flask API connects the page and Python</td><td>MySQL tables</td></tr>
+        <tr><td>EDA findings with plots; correlation ≠ causation</td><td>Gemini is optional; rules parse the request</td><td>Caching and pause-after-block details</td></tr>
+        <tr><td>Hypothesis test: H₀, α, p-value, conclusion</td><td>46 automated tests check the pipeline</td><td>Chat follow-up rules</td></tr>
+        <tr><td>Feature engineering: category rules, six specs, validation, coverage</td><td>1–10 match score checks user needs</td><td>Regex details of budget parsing</td></tr>
+        <tr><td>Proxy target, grouped split, leakage prevention, model comparison</td><td></td><td></td></tr>
+        <tr><td>Holdout MAE / RMSE / R², residuals, and why R² is high</td><td></td><td></td></tr>
+        <tr><td>Same feature code offline and live</td><td></td><td></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============================================================ ANANYA -->
+<section class="part" id="ananya" style="--c:var(--mod-a);--soft:var(--mod-a-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">0:00–3:30 · Opening + Phases 1–2</div><h2>Ananya: problem, data understanding, cleaning</h2></div>
+    <h3>Show</h3>
+    <div class="files"><span>Slide: problem + two pipelines</span><span>01_data_understanding.ipynb → missing-value table, “Phase 1 findings”</span><span>02_preprocessing.ipynb → clean_price, clean_rating, clean_review_count</span></div>
+    <h3>Say</h3>
+    <ol class="steps">
+      <li><div><b>Problem.</b> “Buyers compare hundreds of listings by price, rating and specs. Keyword search can't turn ‘a laptop for video editing’ into measurable needs. We treated this as a data science problem.”</div></li>
+      <li><div><b>Two pipelines.</b> “Offline, seven notebooks analyse a Kaggle dataset and train a model. Live, the website uses the same feature code and that model on current Amazon listings.”</div></li>
+      <li><div><b>Dataset.</b> “5,010 Amazon India products, 10 columns, all stored as text because of ₹ signs, commas and ‘out of 5 stars’.”</div></li>
+      <li><div><b>Quality findings.</b> “270 missing discount prices, 34 missing review counts, 31 missing actual prices. No exact duplicates, but 685 rows share a title. The category columns have only one value, so product type must come from the title.”</div></li>
+      <li><div><b>Key insight.</b> “review_rating is always a whole number from 1 to 5: it is one review's stars, not the product average. 74.5% are 5-star. We state this caveat throughout.”</div></li>
+      <li><div><b>Cleaning.</b> “We wrote cleaning functions for prices, ratings and counts. 18 counts said ‘FREE Delivery by Amazon’, so missing counts rose from 34 to 52. We did not invent values: we added missing-value flags, computed discounts only for the 4,740 rows with both prices, and kept all 5,010 rows.”</div></li>
+    </ol>
+    <div class="note"><p><b>Hand-over:</b> “With clean data, Pawni will show what the data looks like and what we tested statistically.”</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ PAWNI -->
+<section class="part" id="pawni" style="--c:var(--mod-b);--soft:var(--mod-b-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">3:30–6:00 · Phases 3–4</div><h2>Pawni: EDA and statistics</h2></div>
+    <h3>Show</h3>
+    <div class="files"><span>eda_outputs/02_price_distributions.png and 03_log_price_distributions.png</span><span>eda_outputs/04_rating_distribution.png</span><span>eda_outputs/07_correlation_heatmap.png</span><span>04_statistical_analysis.ipynb → Mann–Whitney output</span></div>
+    <h3>Say</h3>
+    <ol class="steps">
+      <li><div><b>Prices are skewed.</b> “Mean discount price is ₹3,078 but the median is ₹649; a few phones and laptops pull the mean up. That's why we also plot log prices, and why the median is the better typical value.”</div></li>
+      <li><div><b>Ratings.</b> “Ratings pile up at 5 (mean 4.49, skewness −2.33). Discounts are large: median 56%.”</div></li>
+      <li><div><b>Correlation.</b> “Discount price and actual price correlate at 0.96. Rating has almost no linear link with price, review count or discount. These are associations, not causes.”</div></li>
+      <li><div><b>Outliers.</b> “IQR flags 633 discount prices, but they are real premium products, so we investigated them instead of deleting them.”</div></li>
+      <li><div><b>Hypothesis test.</b> “Do heavily discounted products get different ratings? H₀: same distribution. We used Mann–Whitney U because ratings aren't normal. Two groups of 2,370, α = 0.05, p = 0.491, so we fail to reject H₀. The effect size is tiny (r = 0.009).”</div></li>
+      <li><div><b>Significance vs importance.</b> “Spearman shows rating vs number of ratings ρ = −0.086 with p &lt; 0.001: significant only because n is large, not practically important.”</div></li>
+    </ol>
+    <div class="note"><p><b>Hand-over:</b> “Most useful information is hidden in product titles. Ajitesh will show how we turned text into features.”</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ AJITESH -->
+<section class="part" id="ajitesh" style="--c:var(--mod-c);--soft:var(--mod-c-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">6:00–8:00 · Phase 5</div><h2>Ajitesh: feature engineering</h2></div>
+    <h3>Show</h3>
+    <div class="files"><span>05_feature_engineering.ipynb → category counts, 13-check table, coverage</span><span>phase_outputs/phase5_feature_coverage.png</span><span>One live notebook cell (below)</span></div>
+    <h3>Say</h3>
+    <ol class="steps">
+      <li><div><b>Why.</b> “Models need numbers, but RAM, storage and screen size are hidden in titles like ‘16GB DDR5 RAM, 1TB SSD, 15.6-inch 144Hz’.”</div></li>
+      <li><div><b>Categories.</b> “Ordered regex rules give each title a category. A laptop must name a laptop and list a processor plus RAM, storage or OS, so a ‘laptop backpack’ is an accessory. Unclear titles stay unclassified: 1,076 of 5,010.”</div></li>
+      <li><div><b>Six specs, category-aware.</b> “RAM, storage, battery, screen size, charging watts and refresh rate, only for product types where they make sense, so ‘15.6 inch’ on a bag isn't a screen size.”</div></li>
+      <li><div><b>Validation.</b> “13 hand-checked titles all pass, and no value is out of range. Coverage is low (RAM found in 245 rows) because titles omit specs; missing stays missing.”</div></li>
+      <li><div><b>Same code live.</b> Run the cell below: “This is the exact function the website uses on live Amazon titles.”</div></li>
+    </ol>
+    <h4>Live notebook cell (run from the “Data Science” folder, works without internet)</h4>
+<pre class="block">import sys; sys.path.insert(0, "..")
+from backend.product_features import classify_product, extract_title_specs, product_features
+from backend.ml_model import predict_score
+
+title = 'Lenovo LOQ Intel Core i7-13650HX, NVIDIA RTX 4060 8GB, 16GB DDR5 RAM, 1TB SSD, 15.6" FHD 144Hz Gaming Laptop'
+category = classify_product(title)
+print(category)                                   # Laptops
+print(extract_title_specs(title, category))       # ram 16, storage 1024, screen 15.6, refresh 144
+product = {"product_title": title, "product_price": 89990,
+           "product_star_rating": 4.3, "product_num_ratings": 250}
+print(product_features(product))                  # the 16 model inputs
+print(predict_score(product))                     # about 0.555
+print(classify_product("Laptop Backpack for 15.6 inch Laptops"))   # Computer Accessories</pre>
+    <div class="note"><p>Point out that <code>discount_percent</code> comes out missing: the live title has no original price, so the model's imputer fills it with the training median. That's a good, honest talking point.</p></div>
+    <div class="note"><p><b>Hand-over:</b> “These 16 features are the model's inputs. Vedansh will show how we trained and evaluated it.”</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ VEDANSH -->
+<section class="part" id="vedansh" style="--c:var(--mod-d);--soft:var(--mod-d-soft)">
+  <div class="wrap">
+    <div class="module-head"><div class="eyebrow">8:00–10:30 · Phases 6–7 · and 13:00–14:00 close</div><h2>Vedansh: model, evaluation, limitations</h2></div>
+    <h3>Show</h3>
+    <div class="files"><span>model_outputs/phase6_model_comparison.png</span><span>model_outputs/final_evaluation.csv (or the table in notebook 07)</span><span>model_outputs/phase7_residual_diagnostics.png</span><span>model_outputs/phase6_feature_importance.png</span></div>
+    <h3>Say</h3>
+    <ol class="steps">
+      <li><div><b>Target.</b> “There's no ‘good product’ label, so we built a transparent proxy: 0.45 × rating/5 + 0.35 × scaled log review count + 0.20 × discount. It is a teaching target, not user satisfaction.”</div></li>
+      <li><div><b>Leakage-free split.</b> “Colour variants of the same product would leak between train and test, so GroupShuffleSplit keeps each product's listings together: 995 holdout rows, 3,223 train, 792 validation, zero shared groups. The imputer is fitted on training data only.”</div></li>
+      <li><div><b>Comparison.</b> “Against a mean baseline (RMSE 0.117): Linear Regression 0.027, Decision Tree 0.024, Random Forest 0.014. Random Forest wins and is saved with joblib.”</div></li>
+      <li><div><b>Holdout.</b> “Evaluated once on the holdout: MAE 0.0042, RMSE 0.0093, R² 0.993. Residuals centre on zero but spread more for low scores.”</div></li>
+      <li><div><b>Say the caveat first.</b> “R² is high because rating, reviews and discount are both inputs and target ingredients. Feature importance confirms it: rating 0.61, reviews 0.24, discount 0.14. So this shows a consistent pipeline, not recommendation accuracy, which is why the website uses the model only to break ties.”</div></li>
+    </ol>
+    <h3>Closing (13:00–14:00)</h3>
+    <ul>
+      <li><b>Limitations:</b> single-review ratings, only 28 laptops, sparse specs, proxy target, live accuracy not measured, scraping can be blocked.</li>
+      <li><b>Ethics:</b> low-volume scraping with no bypassing of robot checks, no personal data, API keys kept out of code, no invented reviews.</li>
+      <li><b>Next:</b> save live listings to retrain on current data, collect human relevance labels for Precision@5 / NDCG, use an official product API.</li>
+    </ul>
+    <div class="note"><p><b>Hand-over to demo:</b> “Now let's see this pipeline being used on live Amazon data.”</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ DEMO -->
+<section class="part" id="demo">
+  <div class="wrap">
+    <h2>Live demo, framed as data science</h2>
+    <p>Pawni types; each owner says one sentence about their step while results load. Narrate what the data pipeline does, not how the page looks.</p>
+    <ol class="steps">
+      <li><div><b>Search: <code>gaming laptop under 100000</code></b><br>
+      Ananya: “The request becomes structured data: category laptop, budget ₹1,00,000, use gaming.”<br>
+      Ajitesh: “Live listings go through the same <code>classify_product</code> and spec extraction you saw in notebook 05; look at the specs panel.”<br>
+      Vedansh: “Each product gets a model score and a 1–10 match score; products meeting more needs come first.”</div></li>
+      <li><div><b>Open the top product</b><br>Point at the match badge, the extracted specs, and “Why it fits you” / “Things to know”: “These come from the real spec table and counted real reviews, nothing is generated.”</div></li>
+      <li><div><b>Follow-up: <code>for video editing</code></b><br>Vedansh: “The budget stays, and the use changes the hardware needs: laptops without a dedicated graphics card drop to 5 out of 10 or less.”</div></li>
+    </ol>
+    <h3>If something fails</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Problem</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>Amazon blocks (“wait about N minutes”)</td><td>Say: “Amazon rate-limits automated requests; our app detects this and pauses instead of retrying.” Repeat a search you made earlier (served from the 15-minute cache), then switch to the notebook cell above, which needs no internet.</td></tr>
+        <tr><td>No internet at all</td><td>Run the notebook cell, then <code>python -m unittest discover -s tests -v</code>: 46 tests run the full pipeline on a fixed catalogue.</td></tr>
+        <tr><td>Server not starting</td><td>Keep a screen recording of a working demo made the day before.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============================================================ SLIDES -->
+<section class="part" id="slides">
+  <div class="wrap">
+    <h2>Suggested slides (10)</h2>
+    <p>Keep slides light: one idea, one number or plot each. Open notebooks for the details.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>#</th><th>Slide</th><th>Content</th><th>Speaker</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Title</td><td>Project name, course, team, faculty</td><td>Ananya</td></tr>
+        <tr><td class="num">2</td><td>Problem and approach</td><td>Why choosing electronics is hard; the two-pipeline diagram</td><td>Ananya</td></tr>
+        <tr><td class="num">3</td><td>Dataset and quality</td><td>5,010 × 10; missing-value counts; review_rating caveat</td><td>Ananya</td></tr>
+        <tr><td class="num">4</td><td>Preprocessing</td><td>Cleaning functions; 34 → 52 missing counts; no rows deleted</td><td>Ananya</td></tr>
+        <tr><td class="num">5</td><td>EDA</td><td>Price histogram (raw vs log) and correlation heatmap</td><td>Pawni</td></tr>
+        <tr><td class="num">6</td><td>Statistics</td><td>Mann–Whitney: H₀, α, U, p, conclusion</td><td>Pawni</td></tr>
+        <tr><td class="num">7</td><td>Feature engineering</td><td>Title → category + six specs; 13/13 checks; coverage chart</td><td>Ajitesh</td></tr>
+        <tr><td class="num">8</td><td>Model development</td><td>Proxy target formula; grouped split; comparison chart</td><td>Vedansh</td></tr>
+        <tr><td class="num">9</td><td>Evaluation</td><td>Holdout table; residual plot; why R² is high</td><td>Vedansh</td></tr>
+        <tr><td class="num">10</td><td>Limitations, ethics, next steps</td><td>Three short lists</td><td>Vedansh</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note"><p>Every plot named here already exists in <code>Data Science/eda_outputs/</code>, <code>model_outputs/</code> or <code>phase_outputs/</code>, so you can paste them straight into slides.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ PHRASES -->
+<section class="part" id="phrases">
+  <div class="wrap">
+    <h2>Words to use and avoid</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Say</th><th>Instead of</th></tr></thead>
+      <tbody>
+        <tr><td>“The model predicts a proxy score built from rating, popularity and discount.”</td><td>“The AI knows which product is best.”</td></tr>
+        <tr><td>“Holdout R² is 0.993, which is expected because the target is built from the inputs.”</td><td>“Our model is 99% accurate.”</td></tr>
+        <tr><td>“We found no significant difference (p = 0.491).”</td><td>“Discounts don't affect ratings.”</td></tr>
+        <tr><td>“Rating and price are barely correlated in this sample.”</td><td>“Price causes ratings to…”</td></tr>
+        <tr><td>“The live score is applied to Amazon data but not evaluated on it, because there are no labels.”</td><td>“The model works perfectly on live data.”</td></tr>
+        <tr><td>“Missing values were kept and imputed with the training median inside the pipeline.”</td><td>“We removed bad data.”</td></tr>
+      </tbody>
+    </table></div>
+    <p>Never call a regression result “accuracy”: accuracy is a classification metric. Use MAE, RMSE and R².</p>
+  </div>
+</section>
+
+<!-- ============================================================ CHECKLIST -->
+<section class="part" id="checklist">
+  <div class="wrap">
+    <h2>Day-before checklist</h2>
+    <ol class="steps">
+      <li><div>Run all seven notebooks once so outputs and plots are visible when you open them.</div></li>
+      <li><div>Start the website (<code>python -m backend.app</code>) and do the two demo searches, so they are fresh in the cache.</div></li>
+      <li><div>Run the notebook feature cell and the test suite once.</div></li>
+      <li><div>Record a two-minute screen recording of a working demo as a backup.</div></li>
+      <li><div>Fix the report's four issues: Kaggle reference placeholder, the feature file name, “will be handled” wording, and the “Introduction / Background” heading.</div></li>
+      <li><div>Each member rehearses their part out loud with a timer and reads their viva questions in the FCDS Team Guide.</div></li>
+      <li><div>Agree who answers questions about the website (Pawni for the page, Vedansh for ranking and the API, Ajitesh for the scraper).</div></li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">ElectronicsAI · FCDS PBL presentation plan · All figures match the project's notebook outputs and saved results.</div></footer>
+
+</body>
+</html>
